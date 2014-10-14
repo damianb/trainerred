@@ -1,0 +1,16 @@
+{
+  "name": "trainerred",
+  "version": "0.2.0",
+  "description": "subreddit submission data analysis",
+  "main": "index.js",
+  "author": "Damian Bushong <katana@odios.us>",
+  "license": "MIT License",
+  "dependencies": {
+    "nconf": "^0.6.9",
+    "snoocore": "^1.9.0",
+    "sqlite3": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=0.11"
+  }
+}
