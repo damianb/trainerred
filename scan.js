@@ -58,7 +58,7 @@ trainerred.auth()
 			}),
 			// users to review
 			when.promise(function(resolve, reject) {
-				db.all('SELECT author, COUNT(author) FROM posts WHERE _removed = 1 AND created_utc > $earliestTime'
+				db.all('SELECT author, COUNT(author) as rem_count FROM posts WHERE _removed = 1 AND created_utc > $earliestTime'
 					+ ' GROUP BY author ORDER BY COUNT(author) DESC LIMIT 20', params, function(err, rows) {
 					if(err) {
 						return reject(err)
@@ -69,7 +69,7 @@ trainerred.auth()
 			}),
 			// domains to review
 			when.promise(function(resolve, reject) {
-				db.all('SELECT domain, COUNT(domain) FROM posts WHERE _removed = 1 AND created_utc > $earliestTime AND banned_by <> "AutoModerator"'
+				db.all('SELECT domain, COUNT(domain) as rem_count FROM posts WHERE _removed = 1 AND created_utc > $earliestTime AND banned_by <> "AutoModerator"'
 					+ 'GROUP BY domain ORDER BY COUNT(domain) DESC LIMIT 10', params, function(err, rows) {
 					if(err) {
 						return reject(err)
@@ -83,8 +83,20 @@ trainerred.auth()
 	.then(function(total, removed, users, domains) {
 		console.log('done grabbing db entries, sending modmail')
 
+		var removalRate = (removed == 0) ? 0 : Math.round(removed / total)
+
 		var msg = '## TrainerRed initial database population complete.'
-		msg + '\n\nTrainerRed has identified ' + total + ' entries within the last 7 days for analysis.' // todo expand upon modmail message
+		msg += '\n\nTrainerRed has identified ' + total + ' entries (' + removed + ' removals; ' + removalRate + '% removal rate) within the last 7 days for analysis.'
+		msg += '\n\n---\n### users to review'
+		msg += '\n\nsubmitter | rem count'
+		users.forEach(function(user) {
+			msg += '\n/u/' + user.author + ' | ' + user.rem_count
+		})
+		msg += '\n\n---\n### domains to review'
+		msg += '\n\nsubmitter | rem count'
+		users.forEach(function(domain) {
+			msg += '\n[' + domain.domain + '](https://reddit.com/domain/' + domain.domain + '/) | ' + domain.rem_count
+		})
 		return trainerred.modmail('TrainerRed Database updated', msg)
 	})
 	.then(function() {
