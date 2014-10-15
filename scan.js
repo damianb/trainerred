@@ -85,7 +85,7 @@ trainerred.auth()
 		var total = res[0], removed = res[1], users = res[2], domains = res[3]
 		console.log('done grabbing db entries, sending modmail')
 
-		var removalRate = (removed == 0) ? 0 : Math.round(removed / total)
+		var removalRate = (removed == 0) ? 0 : Math.round(removed / total, -3) * 100
 
 		var msg = '## TrainerRed initial database population complete.'
 		msg += '\n\nTrainerRed has identified ' + total + ' entries (' + removed + ' removals; ' + removalRate + '% removal rate) within the last 7 days for analysis.'
