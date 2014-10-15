@@ -80,7 +80,9 @@ trainerred.auth()
 			})
 		)
 	})
-	.then(function(total, removed, users, domains) {
+	.then(function(res) {
+		// sigh, why does when.join have to be stupid...
+		var total = res[0], removed = res[1], users = res[2], domains = res[3]
 		console.log('done grabbing db entries, sending modmail')
 
 		var removalRate = (removed == 0) ? 0 : Math.round(removed / total)
@@ -88,13 +90,13 @@ trainerred.auth()
 		var msg = '## TrainerRed initial database population complete.'
 		msg += '\n\nTrainerRed has identified ' + total + ' entries (' + removed + ' removals; ' + removalRate + '% removal rate) within the last 7 days for analysis.'
 		msg += '\n\n---\n### users to review'
-		msg += '\n\nsubmitter | rem count'
+		msg += '\n\nsubmitter | rem count\n---|---'
 		users.forEach(function(user) {
 			msg += '\n/u/' + user.author + ' | ' + user.rem_count
 		})
 		msg += '\n\n---\n### domains to review'
-		msg += '\n\nsubmitter | rem count'
-		users.forEach(function(domain) {
+		msg += '\n\nsubmitter | rem count\n---|---'
+		domains.forEach(function(domain) {
 			msg += '\n[' + domain.domain + '](https://reddit.com/domain/' + domain.domain + '/) | ' + domain.rem_count
 		})
 		return trainerred.modmail('TrainerRed Database updated', msg)
