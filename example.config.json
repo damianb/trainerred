@@ -1,0 +1,12 @@
+{
+	"subreddit":"netsec",
+	"fatalOnError": true,
+	"user":{
+		"name": "_TrainerRed",
+		"password": "example config, no password here"
+	},
+	"consumer":{
+		"key": "oauth consumer key here",
+		"secret": "oauth consumer secret here"
+	}
+}
