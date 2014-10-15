@@ -52,10 +52,10 @@ trainerred.auth()
 		console.log('done')
 
 		var msg = '## TrainerRed initial database population complete.'
-		msg + '\n\nTrainerRed has obtained ' + total + ' entries for analysis.  Analysis data will be collected regularly, results will be soon to follow.'
+		msg += '\n\nTrainerRed has obtained ' + total + ' entries for analysis.  Analysis data will be collected regularly, results will be soon to follow.'
 		return trainerred.modmail('TrainerRed Database Populated', msg)
 	})
 	.then(function() {
-		console.log('sent! ...i hope')
+		console.log('initial modmail sent!')
 	})
 	.catch(trainerred.onError)
