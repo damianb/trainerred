@@ -109,6 +109,7 @@ function TrainerRed() {
 		// /domain/:domain is undocumented and therefore unsupported by reddit-api-generator
 		// ...and therefore unsupported by snoocore, meaning we have to be a hacky asshole for this shit to work.
 		// a damn shame, since this makes the iterative function even MORE of an ugly mess, but oh well.
+		// once this endpoint is properly documented (and oauth-supported) we'll be able to get rid of raw mode in iterative()
 		//
 		// reference github issue: reddit/reddit#1147
 		//
@@ -176,7 +177,8 @@ function TrainerRed() {
 		}
 
 		var extractor = function(child) {
-			// ignore self posts, they're irrelevant to us; further, ignore anything outside our own subreddit (such as in the case of user/domain queries)
+			// ignore self posts, they're irrelevant to us
+			// further, ignore anything outside our own subreddit (such as in the case of user/domain queries)
 			if(!child || child.data.is_self === true || child.data.subreddit !== subreddit) {
 				return false
 			}
