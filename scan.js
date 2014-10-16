@@ -6,7 +6,7 @@
 // @license MIT license
 // @url <https://github.com/damianb/>
 // @reddit <https://reddit.com/u/katana__>
-// @twitter <https://twitter.com/burningcrimson>
+// @twitter <https://twitter.com/blazingcrimson>
 //
 
 var	trainerred = require('./trainerred'),
