@@ -1,6 +1,6 @@
 {
   "name": "trainerred",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "subreddit submission data analysis",
   "main": "index.js",
   "author": "Damian Bushong <katana@odios.us>",
@@ -8,7 +8,8 @@
   "dependencies": {
     "nconf": "^0.6.9",
     "snoocore": "^1.9.0",
-    "sqlite3": "^3.0.2"
+    "sqlite3": "^3.0.2",
+    "commander": "^2.3.0"
   },
   "engines": {
     "node": ">=0.11"
