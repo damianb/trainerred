@@ -15,6 +15,7 @@ var	trainerred = require('./trainerred'),
 
 trainerred.auth()
 	.then(function() {
+		//console.log('running trainerred in this method is DEPRECATED; please reference the new documentation')
 		console.log('authenticated, querying...')
 	})
 	.then(function() {
