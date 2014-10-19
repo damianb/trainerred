@@ -131,7 +131,7 @@ function TrainerRed() {
 	}
 
 	api.queryUser = function(user) {
-		return iterative(depth, 'user/$username/submitted.json', { $username: user, sort: 'new' }).then(function() {
+		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }, true).then(function() {
 			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
 
 			var params = { $username: user, $last_scanned: Date.now() }
@@ -155,6 +155,10 @@ function TrainerRed() {
 			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version,
 			to: '/r/' + subreddit
 		})
+	}
+
+	api.removalRate = function(removed, total) {
+		return (removed == 0) ? 0 : Math.round((removed / total) * 1000) / 10
 	}
 
 	//
