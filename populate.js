@@ -20,7 +20,7 @@ trainerred.auth()
 		trainerred.setTable()
 	})
 	.then(function() {
-		//console.log('running trainerred in this method is DEPRECATED; please reference the new documentation')
+		console.log('WARNING: running trainerred in this method is DEPRECATED; please reference the new documentation')
 		console.log('authenticated, querying...')
 	})
 	.then(function() {
