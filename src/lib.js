@@ -267,3 +267,4 @@ function TrainerRed(configName, dbName) {
 }
 
 module.exports = TrainerRed
+module.exports.when = when
