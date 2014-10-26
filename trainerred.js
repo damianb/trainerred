@@ -1,4 +1,4 @@
-'use strict'
+#!/usr/bin/env node
 //
 // TrainerRed - subreddit submission analysis bot
 // ---
@@ -9,259 +9,64 @@
 // @twitter <https://twitter.com/blazingcrimson>
 //
 
-var	nconf = require('nconf'),
-	pkg = require('./package.json'),
-	sqlite = require('sqlite3').verbose(),
-	snoocore = require('snoocore'),
-	when = snoocore.when
+var	trainerred = require(__dirname + '/src/lib'),
+	db = trainerred.db,
+	when = trainerred.when,
+	cli = require('commander'),
+	pkg = require(__dirname + '/package.json')
 
-nconf.argv()
-	.env()
-	.file({ file: './config.json' })
+cli.version(pkg.version)
 
-function TrainerRed() {
-	var api = {},
-		subreddit = nconf.get('subreddit'),
-		exitOnError = nconf.get('fatalOnError'),
-		// general purpose var here for query depth, maximum fetch size (reddit only allows up to 100, mind)
-		depth = 200,
-		maxFetch = 100
+cli.command('populate')
+	.description('populate the database with a large set of API queries')
+	.option('--max-depth <depth>', 'maximum depth for API queries to reach (0 < depth <= 1000), default 1000')
+	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
+	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
+	.option('-q, --quiet', 'silence informational console messages')
+	.action(function() {
+		// todo
+	})
 
-	// some call this "error handling"
-	// i call it "drop that shit like it's hot"
-	var onError = api.onError = function(error, crit) {
-		console.error(error.stack || error)
-		if (exitOnError === true || crit === true) {
-			process.exit(1)
-		}
-	}
+cli.command('scan')
+	.description('run TrainerRed in weekly scan mode, creating a report via moderator mail')
+	.option('-d. --days <days>', 'number of days of material to use in the report, default 7')
+	.option('--no-mail', 'do not send modmail report')
+	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
+	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
+	.option('-q, --quiet', 'silence informational console messages')
+	.action(function() {
+		// todo
+	})
 
-	// instances of important things.
-	var db = api.db = new sqlite.Database(__dirname + '/trainerred.db'),
-		reddit = new snoocore({
-			userAgent: 'TrainerRed v' + pkg.version + ' - /r/' + subreddit,
-			throttle: 5000, // bigger delay for our script, since we're querying harder than most things do
-		})
+cli.command('domain <domain>')
+	.description('run TrainerRed against a supplied domain')
+	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
+	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
+	.option('-q, --quiet', 'silence informational console messages')
+	.action(function() {
+		// todo
+	})
 
-	// expose when, sr info
-	api.when = when
-	api.subreddit = subreddit
+cli.command('user <user>')
+	.description('run TrainerRed against a supplied user')
+	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
+	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
+	.option('-q, --quiet', 'silence informational console messages')
+	.action(function() {
+		// todo
+	})
 
-	// externally provided methods
-	api.auth = function() {
-		// todo consider full oauth token steps?  move away from "script" mode?
-		return reddit.auth(snoocore.oauth.getAuthData('script', {
-			consumerKey: nconf.get('consumer:key'),
-			consumerSecret: nconf.get('consumer:secret'),
-			username: nconf.get('user:name'),
-			password: nconf.get('user:password'),
-			scope: [
-				'identity',
-				'read',
-				'history',
-				'modlog',
-				'privatemessages'
-			]
-		})).catch(onError)
-	}
+cli.command('setup')
+	.description('setup prompts for required config values, builds config file')
+	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
+	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
+	.option('-q, --quiet', 'silence informational console messages')
+	.action(function() {
+		// todo
+	})
 
-	api.setTable = function() {
-		return when.promise(function(resolve, reject) {
-			db.run('CREATE TABLE IF NOT EXISTS posts ('
-				+ 'id CHAR(15) UNIQUE NOT NULL, banned_by VARCHAR(32), domain VARCHAR(100) NOT NULL, '
-				+ 'approved_by VARCHAR(32), author VARCHAR(32) NOT NULL, url VARCHAR(255) NOT NULL, '
-				+ 'created_utc INTEGER NOT NULL, permalink VARCHAR(255) NOT NULL, _removed INTEGER NOT NULL,'
-				+ '_last_touched INTEGER NOT NULL)', function(err) {
-				if(err) {
-					return reject(err)
-				}
-				resolve(true)
-			})
-		}).then(when.promise(function(resolve, reject) {
-			db.run('CREATE TABLE IF NOT EXISTS userscans ('
-				+ 'username VARCHAR(32) UNIQUE NOT NULL, last_scanned INTEGER NOT NULL)', function(err) {
-				if(err) {
-					return reject(err)
-				}
-				resolve(true)
-			})
-		})).then(when.promise(function(resolve, reject) {
-			db.run('CREATE TABLE IF NOT EXISTS domainscans ('
-				+ 'domain VARCHAR(100) UNIQUE NOT NULL, last_scanned INTEGER NOT NULL)', function(err) {
-				if(err) {
-					return reject(err)
-				}
-				resolve(true)
-			})
-		}))
-	}
-
-	// PAPERS PLS
-	api.papers = function() {
-		return reddit('/api/v1/me').get()
-	}
-
-	api.queryListing = function(uri, params, _depth) {
-		return iterative(_depth || depth, uri, params)
-	}
-
-	api.queryDomain = function(domain) {
-		// /domain/:domain is undocumented and therefore unsupported by reddit-api-generator
-		// ...and therefore unsupported by snoocore, meaning we have to be a hacky asshole for this shit to work.
-		// a damn shame, since this makes the iterative function even MORE of an ugly mess, but oh well.
-		// once this endpoint is properly documented (and oauth-supported) we'll be able to get rid of raw mode in iterative()
-		//
-		// reference github issue: reddit/reddit#1147
-		//
-		return iterative(depth, 'https://www.reddit.com/domain/$domain/new.json', { $domain: domain }, true).then(function() {
-			var sql = 'INSERT OR IGNORE INTO domainscans (domain, last_scanned) VALUES ($domain, $last_scanned)'
-
-			var params = { $domain: domain, $last_scanned: Date.now() }
-			db.run(sql, params, function(err) {
-				if(err) {
-					return onError(err)
-				}
-
-				if(!this.lastID) {
-					sql = 'UPDATE domainscans SET last_scanned = $last_scanned WHERE domain = $domain'
-					db.run(sql, params)
-				}
-			})
-		})
-	}
-
-	api.queryUser = function(user) {
-		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }, true).then(function() {
-			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
-
-			var params = { $username: user, $last_scanned: Date.now() }
-			db.run(sql, params, function(err) {
-				if(err) {
-					return onError(err)
-				}
-
-				if(!this.lastID) {
-					sql = 'UPDATE userscans SET last_scanned = $last_scanned WHERE username = $username'
-					db.run(sql, params)
-				}
-			})
-		})
-	}
-
-	api.modmail = function(title, message) {
-		return reddit("/api/compose").post({
-			api_type: 'json',
-			subject: title,
-			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version,
-			to: '/r/' + subreddit
-		})
-	}
-
-	api.removalRate = function(removed, total) {
-		return (removed == 0) ? 0 : Math.round((removed / total) * 1000) / 10
-	}
-
-	//
-	// here be dragons!
-	// ...i'm serious.
-	//
-	// the following method is private, not to be publicly accessed because i said so
-	//
-	// also, a huge shout out to gh user trevorsenior for adding the listing feature to snoocore.
-	// said feature made this function FAR simpler in the end and probably dropped the size of the code by half.
-	//
-	var iterative = function(depth, uri, params, raw) {
-		var ret = [], _params = {
-			limit: maxFetch
-		}
-		if(params) {
-			for(var attr in params) {
-				_params[attr] = params[attr]
-			}
-		}
-
-		var extractor = function(child) {
-			// ignore self posts, they're irrelevant to us
-			// further, ignore anything outside our own subreddit (such as in the case of user/domain queries)
-			if(!child || child.data.is_self === true || child.data.subreddit !== subreddit) {
-				return false
-			}
-
-			// build our sql param object now, while we have a moment
-			return {
-				$id: child.data.id,
-				$banned_by: child.data.banned_by,
-				$domain: child.data.domain,
-				$approved_by: child.data.approved_by,
-				$author: child.data.author,
-				$url: child.data.url,
-				$created_utc: child.data.created_utc,
-				$permalink: 'https://reddit.com' + child.data.permalink,
-				$_removed: !!child.data.banned_by ? 1 : 0
-			}
-		}
-
-		var inserter = function(child) {
-			if(!child || child === null) {
-				return
-			}
-
-			child.$_last_touched = Date.now()
-			// unfortunately, the above is going to be of a different format than created_utc.
-			// we're using time in milliseconds; reddit is going by UNIX standard, which is seconds.
-			// I -could- convert it over, but fuck it. I do what I want.
-
-			var sql = 'INSERT OR IGNORE INTO posts (id, banned_by, domain, approved_by, author, url, created_utc, permalink, _removed, _last_touched)'
-			sql += 'VALUES ($id, $banned_by, $domain, $approved_by, $author, $url, $created_utc, $permalink, $_removed, $_last_touched)'
-
-			db.run(sql, child, function(err) {
-				if(err) {
-					return onError(err)
-				}
-
-				if(!this.lastID) {
-					sql = 'UPDATE posts SET banned_by = $banned_by, approved_by = $approved_by, _removed = $_removed, _last_touched = $_last_touched'
-					sql += ' WHERE id = $id AND _last_touched > $_last_touched'
-					// no use trying to salvage the child object - just build a quick param object and go.
-					db.run(sql, {
-						$id: child.$id,
-						$approved_by: child.$approved_by,
-						$banned_by: child.$banned_by,
-						$_removed: child.$_removed,
-						$_last_touched: child.$_last_touched,
-					})
-				}
-			})
-		}
-
-		// ugly hack around the domain/:domain/ thing mentioned above not being available.
-		// this is the heart of the iterative "raw mode". maybe sometime soon we'll be able to remove it.
-		var queryOptions = {},
-			queryFn = function() {
-				if(raw === true) {
-					queryOptions = { bypassAuth: true }
-					return reddit.raw(uri)
-				}
-				queryOptions = {}
-				return reddit(uri)
-			}
-
-		// thank you based snoocore dev.
-		return when.iterate(function(slice) {
-				slice.children.map(extractor).forEach(inserter)
-				return slice.next()
-			},
-			function(slice) { return (slice.count >= depth || !!slice.empty ) },
-			function(slice) { return },
-			queryFn().listing(_params, queryOptions)
-		).catch(function(err) {
-			// going to be passive about errors here, since there seems to be shenanigans with user pages
-			// probably something to do with shadowbanned users, but idk.
-			console.error(err)
-		})
-	}
-
-	return api
-}
-
-module.exports = TrainerRed()
+cli.parse(process.argv)

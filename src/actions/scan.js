@@ -9,7 +9,7 @@
 // @twitter <https://twitter.com/blazingcrimson>
 //
 
-var	trainerred = require('./trainerred'),
+var	trainerred = require('./../lib'),
 	db = trainerred.db,
 	when = trainerred.when,
 	util = require('util')
