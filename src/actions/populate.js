@@ -10,15 +10,15 @@
 //
 
 module.exports = function(options) {
-	// sanity check options before takeoff
-	if(!options.maxDepth || (options.maxDepth < 100 || options.maxDepth > 1000)) {
-		options.maxDepth = 1000
-	}
-
 	var output = !!options.quiet ? function() {} || console.log,
 		trainerred = require('./../lib')(options.config, options.db),
 		db = trainerred.db,
 		when = trainerred.when
+
+	// sanity check options before takeoff
+	if(!options.depth || (options.depth < 100 || options.depth > 1000)) {
+		options.depth = 1000
+	}
 
 	trainerred.auth()
 		.then(function() {
@@ -63,5 +63,7 @@ module.exports = function(options) {
 					output('initial modmail sent!')
 				})
 			}
+
+			output('terminating...')
 		.catch(trainerred.onError)
 }

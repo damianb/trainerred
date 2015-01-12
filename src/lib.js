@@ -133,6 +133,7 @@ function TrainerRed(configName, dbName) {
 	}
 
 	api.queryUser = function(user) {
+		// for some reason, this endpoint also requires raw mode. sigh.
 		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }, true).then(function() {
 			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
 
@@ -159,6 +160,7 @@ function TrainerRed(configName, dbName) {
 		})
 	}
 
+	// yes, I'm that lazy.
 	api.removalRate = function(removed, total) {
 		return (removed == 0) ? 0 : Math.round((removed / total) * 1000) / 10
 	}
@@ -173,84 +175,32 @@ function TrainerRed(configName, dbName) {
 	// said feature made this function FAR simpler in the end and probably dropped the size of the code by half.
 	//
 	var iterative = function(depth, uri, params, raw) {
-		var ret = [], _params = {
-			limit: maxFetch
-		}
+		var ret = [],
+			queryOptions = {},
+			_params = {
+				limit: maxFetch
+			}
+
 		if(params) {
 			for(var attr in params) {
 				_params[attr] = params[attr]
 			}
 		}
 
-		var extractor = function(child) {
-			// ignore self posts, they're irrelevant to us
-			// further, ignore anything outside our own subreddit (such as in the case of user/domain queries)
-			if(!child || child.data.is_self === true || child.data.subreddit !== subreddit) {
-				return false
-			}
-
-			// build our sql param object now, while we have a moment
-			return {
-				$id: child.data.id,
-				$banned_by: child.data.banned_by,
-				$domain: child.data.domain,
-				$approved_by: child.data.approved_by,
-				$author: child.data.author,
-				$url: child.data.url,
-				$created_utc: child.data.created_utc,
-				$permalink: 'https://reddit.com' + child.data.permalink,
-				$_removed: !!child.data.banned_by ? 1 : 0
-			}
-		}
-
-		var inserter = function(child) {
-			if(!child || child === null) {
-				return
-			}
-
-			child.$_last_touched = Date.now()
-			// unfortunately, the above is going to be of a different format than created_utc.
-			// we're using time in milliseconds; reddit is going by UNIX standard, which is seconds.
-			// I -could- convert it over, but fuck it. I do what I want.
-
-			var sql = 'INSERT OR IGNORE INTO posts (id, banned_by, domain, approved_by, author, url, created_utc, permalink, _removed, _last_touched)'
-			sql += 'VALUES ($id, $banned_by, $domain, $approved_by, $author, $url, $created_utc, $permalink, $_removed, $_last_touched)'
-
-			db.run(sql, child, function(err) {
-				if(err) {
-					return onError(err)
-				}
-
-				if(!this.lastID) {
-					sql = 'UPDATE posts SET banned_by = $banned_by, approved_by = $approved_by, _removed = $_removed, _last_touched = $_last_touched'
-					sql += ' WHERE id = $id AND _last_touched > $_last_touched'
-					// no use trying to salvage the child object - just build a quick param object and go.
-					db.run(sql, {
-						$id: child.$id,
-						$approved_by: child.$approved_by,
-						$banned_by: child.$banned_by,
-						$_removed: child.$_removed,
-						$_last_touched: child.$_last_touched,
-					})
-				}
-			})
-		}
-
 		// ugly hack around the domain/:domain/ thing mentioned above not being available.
 		// this is the heart of the iterative "raw mode". maybe sometime soon we'll be able to remove it.
-		var queryOptions = {},
-			queryFn = function() {
-				if(raw === true) {
-					queryOptions = { bypassAuth: true }
-					return reddit.raw(uri)
-				}
-				queryOptions = {}
-				return reddit(uri)
+		var queryFn = function() {
+			if(raw === true) {
+				queryOptions = { bypassAuth: true }
+				return reddit.raw(uri)
 			}
+			queryOptions = {}
+			return reddit(uri)
+		}
 
 		// thank you based snoocore dev.
 		return when.iterate(function(slice) {
-				slice.children.map(extractor).forEach(inserter)
+				slice.children.map(iterativeExtractor).forEach(iterativeInserter)
 				return slice.next()
 			},
 			function(slice) { return (slice.count >= depth || !!slice.empty ) },
@@ -259,9 +209,68 @@ function TrainerRed(configName, dbName) {
 		).catch(function(err) {
 			// going to be passive about errors here, since there seems to be shenanigans with user pages
 			// probably something to do with shadowbanned users, but idk.
+			// reddit also occasionally has seizures that result in everything going down, but that's not something we can do much about.
+			//
+			// in the future, we might want to abort on any 50X errors, but we'll leave it alone for now and let the user panic and ^C instead
 			console.error(err)
 		})
-	}trainerred
+	}
+
+	// dragons here too. careful now.
+	var iterativeExtractor = function(child) {
+		// ignore self posts, they're irrelevant to us
+		// further, ignore anything outside our own subreddit (such as in the case of user/domain queries)
+		if(!child || child.data.is_self === true || child.data.subreddit !== subreddit) {
+			return false
+		}
+
+		// build our sql param object now, while we have a moment
+		return {
+			$id: child.data.id,
+			$banned_by: child.data.banned_by,
+			$domain: child.data.domain,
+			$approved_by: child.data.approved_by,
+			$author: child.data.author,
+			$url: child.data.url,
+			$created_utc: child.data.created_utc,
+			$permalink: 'https://reddit.com' + child.data.permalink,
+			$_removed: !!child.data.banned_by ? 1 : 0
+		}
+	}
+
+	// no confirmed dragon sightings here, but we did see a big lizard. don't get careless.
+	var iterativeInserter = function(child) {
+		if(!child || child === null) {
+			return
+		}
+
+		child.$_last_touched = Date.now()
+		// unfortunately, the above is going to be of a different format than created_utc.
+		// we're using time in milliseconds; reddit is going by UNIX standard, which is seconds.
+		// I -could- convert it over, but fuck it. I do what I want.
+
+		var sql = 'INSERT OR IGNORE INTO posts (id, banned_by, domain, approved_by, author, url, created_utc, permalink, _removed, _last_touched)'
+		sql += 'VALUES ($id, $banned_by, $domain, $approved_by, $author, $url, $created_utc, $permalink, $_removed, $_last_touched)'
+
+		db.run(sql, child, function(err) {
+			if(err) {
+				return onError(err)
+			}
+
+			if(!this.lastID) {
+				sql = 'UPDATE posts SET banned_by = $banned_by, approved_by = $approved_by, _removed = $_removed, _last_touched = $_last_touched'
+				sql += ' WHERE id = $id AND _last_touched > $_last_touched'
+				// no use trying to salvage the child object - just build a quick param object and go.
+				db.run(sql, {
+					$id: child.$id,
+					$approved_by: child.$approved_by,
+					$banned_by: child.$banned_by,
+					$_removed: child.$_removed,
+					$_last_touched: child.$_last_touched,
+				})
+			}
+		})
+	}
 
 	return api
 }

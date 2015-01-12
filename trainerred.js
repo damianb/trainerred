@@ -19,30 +19,30 @@ cli.version(pkg.version)
 
 cli.command('populate')
 	.description('populate the database with a large set of API queries')
-	.option('--max-depth <depth>', 'maximum depth for API queries to reach (0 < depth <= 1000), default 1000')
+	.option('--depth <depth>', 'maximum depth for API queries to reach (0 < depth <= 1000), default 1000')
 	.option('--no-mail', 'do not send modmail report')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
 	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		// todo
+		var action = require('./actions/populate')(cli) // hope this works... x.x;
 	})
 
 cli.command('scan')
-	.description('run TrainerRed in weekly scan mode, creating a report via moderator mail')
+	.description('run TrainerRed in periodic scan mode, creating a report via moderator mail')
 	.option('-d. --days <days>', 'number of days of material to use in the report, default 7')
 	.option('--no-mail', 'do not send modmail report')
-	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--export [format]', 'output a specific format for the stdout version of the report (valid: "standard", "json", "csv"; default "standard")')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
 	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		// todo
+		var action = require('./actions/scan')(cli)
 	})
 
 cli.command('domain <domain>')
 	.description('run TrainerRed against a supplied domain')
-	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--export <format>', 'output a specific format for the stdout version of the report (valid: json, csv)')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
 	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
 	.option('-q, --quiet', 'silence informational console messages')
@@ -52,7 +52,7 @@ cli.command('domain <domain>')
 
 cli.command('user <user>')
 	.description('run TrainerRed against a supplied user')
-	.option('--export', 'output a specific format for the stdout version of the report (valid: json, csv)')
+	.option('--export <format>', 'output a specific format for the stdout version of the report (valid: json, csv)')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
 	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
 	.option('-q, --quiet', 'silence informational console messages')
