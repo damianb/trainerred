@@ -215,8 +215,6 @@ module.exports = function(options) {
 			var total = res[0], removed = res[1], users = res[2], domains = res[3]
 			output('done grabbing db entries, sending modmail')
 
-			// todo stdout output formatting
-			// we need to move the math out of the msg concat lines if we want to do this though...
 			// note: this removal rate is only for recent submissions
 			var removalRate = trainerred.removalRate(removed, total)
 			if(options.mail) {
@@ -246,7 +244,7 @@ module.exports = function(options) {
 
 			// do we want to format the report and print it over stdout?
 			// todo: other formatting options for stdout (csv?)
-			// we're ignoring output() here and using console.log straight
+			// note: we're ignoring output() here and using console.log straight
 			var stdoutExport = ''
 			if(!options.export) {
 				switch(options.export) {
