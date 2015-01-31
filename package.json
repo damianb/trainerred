@@ -7,7 +7,7 @@
   "license": "MIT License",
   "dependencies": {
     "nconf": "^0.6.9",
-    "snoocore": "^1.9.0",
+    "snoocore": "^2.4.0",
     "sqlite3": "^3.0.2",
     "commander": "^2.3.0"
   },
