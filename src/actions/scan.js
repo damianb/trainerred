@@ -258,35 +258,25 @@ module.exports = function(options) {
 								return
 							}
 
-							stdoutExport.users.push({
+							var ins = {
 								user: '/u/' + user.user,
-								recent: {
-									total: user.recent.total,
-									removed: user.recent.removed,
-									rate: trainerred.removalRate(user.recent.removed, user.recent.total)
-								}
-								all: {
-									total: user.all.total,
-									removed: user.all.removed,
-									rate: trainerred.removalRate(user.all.removed, user.all.total)
-								}
+								recent: user.recent,
+								all: user.all,
 							})
+							ins.recent.rate = trainerred.removalRate(user.recent.removed, user.recent.total)
+							ins.all.rate = trainerred.removalRate(user.all.removed, user.all.total)
+							stdoutExport.users.push(ins)
 						})
 						domains.forEach(function(domain) {
-							stdoutExport.domains.push({
+							var ins = {
 								domain: domain.domain,
 								domainPage: 'https://www.reddit.com/domain/' + domain.domain,
-								recent: {
-									total: domain.recent.total,
-									removed: domain.recent.removed,
-									rate: trainerred.removalRate(domain.recent.removed, domain.recent.total)
-								}
-								all: {
-									total: domain.all.total,
-									removed: domain.all.removed,
-									rate: trainerred.removalRate(domain.all.removed, domain.all.total)
-								}
-							})
+								recent: domain.recent
+								all: domain.all
+							}
+							ins.recent.rate = trainerred.removalRate(domain.recent.removed, domain.recent.total)
+							ins.all.rate = trainerred.removalRate(domain.all.removed, domain.all.total)
+							stdoutExport.domains.push(ins)
 						})
 						stdoutExport = JSON.stringify(stdoutExport)
 					break

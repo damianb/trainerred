@@ -23,8 +23,6 @@ module.exports = function(options) {
 	trainerred.auth()
 		.then(function() {
 			trainerred.setTable()
-		})
-		.then(function() {
 			output('authenticated, querying...')
 		})
 		.then(function() {
