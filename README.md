@@ -6,7 +6,7 @@ TrainerRed ([/u/_TrainerRed](https://reddit.com/u/_TrainerRed)) is the heart of 
 designed to enable better, more consistent moderation for submissions.
 
 TrainerRed is built for node.js 0.11, and developed on top of the excellent [snoocore](https://github.com/trevorsenior/snoocore) library for the...not-so-well documented reddit API.
-Information retrieved from the reddit API is analyzed locally, then results are modmailed to the subreddit moderators.  Relevant data is stored locally to reduce load on reddit's servers.
+Information retrieved from the reddit API is analyzed locally, with results sent via modmail to the subreddit moderators.  Relevant data is stored locally to reduce load on reddit's servers during the analysis and to keep it from becoming entirely useless when reddit goes down anyways.
 
 #### license
 
@@ -15,6 +15,8 @@ MIT license, see ./LICENSE for full text.
 #### documentation
 
 > It is pitch black. You are likely to be eaten by a grue.
+
+Documentation will likely come upon the completion of 0.5.0.
 
 #### future features?
 
