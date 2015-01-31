@@ -42,6 +42,22 @@ function TrainerRed(configName, dbName) {
 		reddit = new snoocore({
 			userAgent: 'TrainerRed v' + pkg.version + ' - /r/' + subreddit,
 			throttle: 5000, // bigger delay for our script, since we're querying harder than most things do
+			login: {
+				username: nconf.get('user:name'),
+				password: nconf.get('user:password'),
+			},
+			oauth: {
+				type: 'script',
+				consumerKey: nconf.get('consumer:key'),
+				consumerSecret: nconf.get('consumer:secret'),
+				scope: [
+				'identity',
+				'read',
+				'history',
+				'modlog',
+				'privatemessages'
+				]
+			}
 		})
 
 	// expose when, sr info
@@ -52,19 +68,7 @@ function TrainerRed(configName, dbName) {
 	// externally provided methods
 	api.auth = function() {
 		// todo consider full oauth token steps?  move away from "script" mode?
-		return reddit.auth(snoocore.oauth.getAuthData('script', {
-			consumerKey: nconf.get('consumer:key'),
-			consumerSecret: nconf.get('consumer:secret'),
-			username: nconf.get('user:name'),
-			password: nconf.get('user:password'),
-			scope: [
-				'identity',
-				'read',
-				'history',
-				'modlog',
-				'privatemessages'
-			]
-		})).catch(onError)
+		return reddit.auth().catch(onError)
 	}
 
 	api.setTable = function() {

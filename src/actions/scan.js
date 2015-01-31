@@ -24,23 +24,18 @@ module.exports = function(options) {
 	trainerred.auth()
 		.then(function() {
 			output('authenticated, querying...')
-		})
-		.then(function() {
 			if(!options.local) {
 				return trainerred.queryListing('/r/$subreddit/about/$location', {
 					$location: 'spam',
 					$subreddit: trainerred.subreddit,
 					only: 'links',
 					show: 'all'
-				})
-			}
-		})
-		.then(function() {
-			if(!options.local) {
-				return trainerred.queryListing('/r/$subreddit/new', {
-					$subreddit: trainerred.subreddit,
-					only: 'links',
-					show: 'all'
+				}).then(function() {
+					return trainerred.queryListing('/r/$subreddit/new', {
+						$subreddit: trainerred.subreddit,
+						only: 'links',
+						show: 'all'
+					})
 				})
 			}
 		})
