@@ -10,11 +10,17 @@
 //
 
 module.exports = function(options) {
-	var output = !!options.quiet ? function() {} || console.log,
-		trainerred = require('./../lib')(options.config, options.db),
+	var trainerred = require('./../lib')(options.config, options.db),
 		db = trainerred.db,
 		when = trainerred.when,
-		util = require('util')
+		util = require('util'),
+		output = null
+
+	if(options.quiet) {
+		output = function() {}
+	} else {
+		output = console.log
+	}
 
 	// sanity enforcement. options.days has to be (1 <= days <= 14)
 	if(!options.days || (options.days < 1 || options.days > 14)) {
@@ -212,6 +218,9 @@ module.exports = function(options) {
 
 			// note: this removal rate is only for recent submissions
 			var removalRate = trainerred.removalRate(removed, total)
+
+			// todo: REARRANGE! If we do the creation of stdoutExport first, we can actually just reuse the object's formatting right there.
+			// Saves us parsing, makes the code clearer.
 			if(options.mail) {
 				var msg = '## TrainerRed initial database population complete.'
 				msg += '\n\nTrainerRed has identified ' + total + ' entries (' + removed + ' removals; ' + trainerred.removalRate(removed, total) + '% removal rate) within the last 7 days for analysis.'
@@ -232,9 +241,12 @@ module.exports = function(options) {
 						domain.domain, domain.domain, trainerred.removalRate(domain.all.removed, domain.all.total), domain.all.removed, domain.all.total,
 						trainerred.removalRate(domain.recent.removed, domain.recent.total), domain.recent.removed, domain.recent.total)
 				})
+				console.log(msg)
+				/*
 				trainerred.modmail('TrainerRed Database updated', msg).then(function() {
 					output('modmail sent!')
 				})
+				*/
 			}
 
 			// do we want to format the report and print it over stdout?
@@ -262,7 +274,7 @@ module.exports = function(options) {
 								user: '/u/' + user.user,
 								recent: user.recent,
 								all: user.all,
-							})
+							}
 							ins.recent.rate = trainerred.removalRate(user.recent.removed, user.recent.total)
 							ins.all.rate = trainerred.removalRate(user.all.removed, user.all.total)
 							stdoutExport.users.push(ins)
@@ -271,7 +283,7 @@ module.exports = function(options) {
 							var ins = {
 								domain: domain.domain,
 								domainPage: 'https://www.reddit.com/domain/' + domain.domain,
-								recent: domain.recent
+								recent: domain.recent,
 								all: domain.all
 							}
 							ins.recent.rate = trainerred.removalRate(domain.recent.removed, domain.recent.total)

@@ -9,10 +9,7 @@
 // @twitter <https://twitter.com/blazingcrimson>
 //
 
-var	lib = require(__dirname + '/src/lib'),
-	db = trainerred.db,
-	when = trainerred.when,
-	cli = require('commander'),
+var	cli = require('commander'),
 	pkg = require(__dirname + '/package.json')
 
 cli.version(pkg.version)
@@ -26,7 +23,7 @@ cli.command('populate')
 	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		var action = require('./actions/populate')(cli) // hope this works... x.x;
+		var action = require('./src/actions/populate')(cli) // hope this works... x.x;
 	})
 
 cli.command('scan')
@@ -39,7 +36,7 @@ cli.command('scan')
 	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		var action = require('./actions/scan')(cli)
+		var action = require('./src/actions/scan')(cli)
 	})
 
 cli.command('domain <domain>')

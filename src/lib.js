@@ -11,7 +11,7 @@
 
 var	nconf = require('nconf'),
 	sqlite = require('sqlite3').verbose(),
-	pkg = require(__dirname + '/package.json'),
+	pkg = require(__dirname + '/../package.json'),
 	snoocore = require('snoocore'),
 	when = snoocore.when
 
@@ -19,7 +19,7 @@ function TrainerRed(configName, dbName) {
 	nconf
 		.argv()
 		.env()
-		.file({ file: __dirname + '/' + (configName || 'config.json') })
+		.file({ file: __dirname + '/../' + (configName || 'config.json') })
 
 	var api = {},
 		subreddit = nconf.get('subreddit'),
@@ -38,7 +38,7 @@ function TrainerRed(configName, dbName) {
 	}
 
 	// instances of important things.
-	var db = new sqlite.Database(__dirname + '/' + (dbName || 'trainerred.db'))
+	var db = new sqlite.Database(__dirname + '/../' + (dbName || 'trainerred.db')),
 		reddit = new snoocore({
 			userAgent: 'TrainerRed v' + pkg.version + ' - /r/' + subreddit,
 			throttle: 5000, // bigger delay for our script, since we're querying harder than most things do
@@ -51,11 +51,11 @@ function TrainerRed(configName, dbName) {
 				consumerKey: nconf.get('consumer:key'),
 				consumerSecret: nconf.get('consumer:secret'),
 				scope: [
-				'identity',
-				'read',
-				'history',
-				'modlog',
-				'privatemessages'
+					'identity',
+					'read',
+					'history',
+					'modlog',
+					'privatemessages'
 				]
 			}
 		})
@@ -67,7 +67,6 @@ function TrainerRed(configName, dbName) {
 
 	// externally provided methods
 	api.auth = function() {
-		// todo consider full oauth token steps?  move away from "script" mode?
 		return reddit.auth().catch(onError)
 	}
 
@@ -180,15 +179,10 @@ function TrainerRed(configName, dbName) {
 	//
 	var iterative = function(depth, uri, params, raw) {
 		var ret = [],
-			queryOptions = {},
-			_params = {
-				limit: maxFetch
-			}
+			queryOptions = {}
 
-		if(params) {
-			for(var attr in params) {
-				_params[attr] = params[attr]
-			}
+		if(!params.limit) {
+			params.limit = maxFetch
 		}
 
 		// ugly hack around the domain/:domain/ thing mentioned above not being available.
@@ -209,7 +203,7 @@ function TrainerRed(configName, dbName) {
 			},
 			function(slice) { return (slice.count >= depth || !!slice.empty ) },
 			function(slice) { return },
-			queryFn().listing(_params, queryOptions)
+			queryFn().listing(params, queryOptions)
 		).catch(function(err) {
 			// going to be passive about errors here, since there seems to be shenanigans with user pages
 			// probably something to do with shadowbanned users, but idk.
