@@ -139,7 +139,7 @@ module.exports = function(options) {
 	// sanity enforcement. options.days has to be (1 <= days <= 14)
 	var dayWindow = options.days,
 		earliestTime = null,
-		startTime = Date.now()
+		startTime = new Date()
 	if(!dayWindow || (dayWindow < 1 || dayWindow > 14)) {
 		dayWindow = 7
 	}
@@ -280,7 +280,7 @@ module.exports = function(options) {
 
 				msg += '\n\n---\n### users to review'
 				msg += '\n\nsubmitter | overall subs | recent subs\n---|:---:|:---:'
-				users.forEach(function(user) {
+				report.users.forEach(function(user) {
 					if(user.all.removed === 1) {
 						return // pass on this one, we don't need to care about first-struck users (we don't do the same for domains though)
 					}
@@ -291,13 +291,13 @@ module.exports = function(options) {
 
 				msg += '\n\n---\n### domains to review'
 				msg += '\n\ndomain | overall subs | recent subs\n---|:---:|:---:'
-				domains.forEach(function(domain) {
+				report.domains.forEach(function(domain) {
 					msg += util.format('\n[%s](%s/) | %d% (%d of %d rem) | %d% (%d of %d rem)',
 						domain.domain, domain.domainPage, domain.all.rate, domain.all.removed, domain.all.total,
 						domain.recent.rate, domain.recent.removed, domain.recent.total)
 				})
 
-				msg += '\n\n---\nScan started at ' + startTime + '\n\nScan completed at ' + Date.now()
+				msg += '\n\n---\nScan started at ' + startTime + '\n\nScan completed at ' + new Date()
 
 				trainerred.modmail('TrainerRed Database updated', msg).then(function() {
 					output('modmail sent!')
@@ -317,11 +317,11 @@ module.exports = function(options) {
 					default:
 						msg = '\nTrainerRed scan complete'
 						msg += '\n\nTrainerRed has identified ' + report.overview.total + ' entries (' + report.overview.removed + ' removals; '
-						msg += report.overview.rate + '% removal rate) within the last ' + daysWithin + ' days for analysis.'
+						msg += report.overview.rate + '% removal rate) within the last ' + dayWindow + ' days for analysis.'
 
 						msg += '\n\n------------------------\nusers to review\n------------------------'
 						msg += '\n\nsubmitter | overall subs | recent subs'
-						users.forEach(function(user) {
+						report.users.forEach(function(user) {
 							if(user.all.removed === 1) {
 								return // pass on this one, we don't need to care about first-struck users (we don't do the same for domains though)
 							}
@@ -332,13 +332,13 @@ module.exports = function(options) {
 
 						msg += '\n\n------------------------\ndomains to review\n------------------------'
 						msg += '\n\ndomain | overall subs | recent subs'
-						domains.forEach(function(domain) {
+						report.domains.forEach(function(domain) {
 							msg += util.format('\n%s - %s/ | %d% (%d of %d rem) | %d% (%d of %d rem)',
 							domain.domain, domain.domainPage, domain.all.rate, domain.all.removed, domain.all.total,
 							domain.recent.rate, domain.recent.removed, domain.recent.total)
 						})
 
-						msg += '\n\n------------------------\nScan started at ' + startTime + '\n\nScan completed at ' + Date.now()
+						msg += '\n\n------------------------\nScan started at ' + startTime + '\n\nScan completed at ' + new Date()
 						console.log(msg)
 					break
 				}
