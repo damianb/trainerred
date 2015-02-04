@@ -23,7 +23,7 @@ module.exports = function(options) {
 	}
 
 	// internal functions
-	userReview = function(user) {
+	var userReview = function(user) {
 		return when.join(
 			when.promise(function(resolve, reject) {
 				db.get('SELECT COUNT(id) as tCount FROM posts WHERE author = $user', { $user: user }, function(err, row) {
