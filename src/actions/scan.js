@@ -22,15 +22,149 @@ module.exports = function(options) {
 		output = console.log
 	}
 
-	// sanity enforcement. options.days has to be (1 <= days <= 14)
-	if(!options.days || (options.days < 1 || options.days > 14)) {
-		options.days = 7
+	// internal functions
+	var userReview = function(rows) {
+		var user = rows.author
+		if(!options.local) {
+			return trainerred.queryUser(user).fold(_userReview, user)
+		} else {
+			return _userReview(user)
+		}
+	},
+	_userReview = function(user) {
+		return when.join(
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as tCount FROM posts WHERE author = $user', { $user: user }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.tCount)
+				})
+			}),
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as rCount FROM posts WHERE author = $user AND _removed = 1', { $user: user }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.rCount)
+				})
+			}),
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as rec_tCount FROM posts WHERE author = $user'
+				+ ' AND created_utc > $earliestTime', { $user: user, $earliestTime: earliestTime }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.rec_tCount)
+				})
+			}),
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as rec_rCount FROM posts WHERE author = $user AND _removed = 1'
+				+ ' AND created_utc > $earliestTime', { $user: user, $earliestTime: earliestTime }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.rec_rCount)
+				})
+			})
+		).then(function(val) {
+			return {
+				user: user,
+				all: {
+					total: val[0],
+					removed: val[1],
+					rate: trainerred.removalRate(val[1], val[0])
+				},
+				recent: {
+					total: val[2],
+					removed: val[3],
+					rate: trainerred.removalRate(val[3], val[2])
+				}
+			}
+		})
+	},
+	domainReview = function(rows) {
+		var domain = rows.domain
+		if(!options.local) {
+			return trainerred.queryDomain(domain).fold(_domainReview, domain)
+		} else {
+			return _domainReview(domain)
+		}
+	},
+	_domainReview = function(domain) {
+		return when.join(
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as tCount FROM posts WHERE domain = $domain', { $domain: domain }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.tCount)
+				})
+			}),
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as rCount FROM posts WHERE domain = $domain AND _removed = 1', { $domain: domain }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.rCount)
+				})
+			}),
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as rec_tCount FROM posts WHERE domain = $domain'
+				+ ' AND created_utc > $earliestTime', { $domain: domain, $earliestTime: earliestTime }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.rec_tCount)
+				})
+			}),
+			when.promise(function(resolve, reject) {
+				db.get('SELECT COUNT(id) as rec_rCount FROM posts WHERE domain = $domain AND _removed = 1'
+				+ ' AND created_utc > $earliestTime', { $domain: domain, $earliestTime: earliestTime }, function(err, row) {
+					if(err) {
+						return reject(err)
+					}
+
+					resolve(row.rec_rCount)
+				})
+			})
+		).then(function(val) {
+			return {
+				domain: domain,
+				all: {
+					total: val[0],
+					removed: val[1],
+					rate: trainerred.removalRate(val[1], val[0])
+				},
+				recent: {
+					total: val[2],
+					removed: val[3],
+					rate: trainerred.removalRate(val[3], val[2])
+				}
+			}
+		})
 	}
+
+	// sanity enforcement. options.days has to be (1 <= days <= 14)
+	var dayWindow = options.days
+	if(!dayWindow || (dayWindow < 1 || dayWindow > 14)) {
+		dayWindow = 7
+	}
+	var earliestTime = (Math.round(Date.now() / 1000) - (1 * 60 * 60 * 24 * dayWindow))
 
 	trainerred.auth()
 		.then(function() {
-			output('authenticated, querying...')
+			output('authenticated!')
 			if(!options.local) {
+				output('querying reddit...')
+
 				return trainerred.queryListing('/r/$subreddit/about/$location', {
 					$location: 'spam',
 					$subreddit: trainerred.subreddit,
@@ -43,11 +177,14 @@ module.exports = function(options) {
 						show: 'all'
 					})
 				})
+			} else {
+				output('only scanning local records...')
+				return
 			}
 		})
 		.then(function() {
 			// *ominous hand waving during $earliestTime conjuration*
-			var params = { $earliestTime: (Math.round(Date.now() / 1000) - (1 * 60 * 60 * 24 * options.days)) }
+			var params = { $earliestTime: earliestTime }
 
 			var userPromise = when.promise(function(resolve, reject) {
 				db.all('SELECT author FROM posts WHERE _removed = 1 AND created_utc > $earliestTime'
@@ -93,122 +230,8 @@ module.exports = function(options) {
 					})
 				}),
 				// users to review
-				when.map(userPromise, function(rows) {
-					var user = rows.author
-					return trainerred.queryUser(user).then(function() {
-						return when.join(
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as tCount FROM posts WHERE author = $user', { $user: user }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.tCount)
-								})
-							}),
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as rCount FROM posts WHERE author = $user AND _removed = 1', { $user: user }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.rCount)
-								})
-							}),
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as rec_tCount FROM posts WHERE author = $user'
-									+ ' AND created_utc > $earliestTime', { $user: user, $earliestTime: params.$earliestTime }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.rec_tCount)
-								})
-							}),
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as rec_rCount FROM posts WHERE author = $user AND _removed = 1'
-									+ ' AND created_utc > $earliestTime', { $user: user, $earliestTime: params.$earliestTime }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.rec_rCount)
-								})
-							})
-						).then(function(val) {
-							return {
-								user: user,
-								all: {
-									total: val[0],
-									removed: val[1]
-								},
-								recent: {
-									total: val[2],
-									removed: val[3]
-								}
-							}
-						})
-					})
-				}),
-				// domains to review
-				// users to review
-				when.map(domainPromise, function(rows) {
-					var domain = rows.domain
-					return trainerred.queryDomain(domain).then(function() {
-						return when.join(
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as tCount FROM posts WHERE domain = $domain', { $domain: domain }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.tCount)
-								})
-							}),
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as rCount FROM posts WHERE domain = $domain AND _removed = 1', { $domain: domain }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.rCount)
-								})
-							}),
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as rec_tCount FROM posts WHERE domain = $domain'
-									+ ' AND created_utc > $earliestTime', { $domain: domain, $earliestTime: params.$earliestTime }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.rec_tCount)
-								})
-							}),
-							when.promise(function(resolve, reject) {
-								db.get('SELECT COUNT(id) as rec_rCount FROM posts WHERE domain = $domain AND _removed = 1'
-									+ ' AND created_utc > $earliestTime', { $domain: domain, $earliestTime: params.$earliestTime }, function(err, row) {
-									if(err) {
-										return reject(err)
-									}
-
-									resolve(row.rec_rCount)
-								})
-							})
-						).then(function(val) {
-							return {
-								domain: domain,
-								all: {
-									total: val[0],
-									removed: val[1]
-								},
-								recent: {
-									total: val[2],
-									removed: val[3]
-								}
-							}
-						})
-					})
-				})
+				when.map(userPromise, userReview),
+				when.map(domainPromise, domainReview)
 			)
 		})
 		.then(function(res) {
@@ -231,17 +254,16 @@ module.exports = function(options) {
 						return // pass on this one, we don't need to care about first-struck users (we don't do the same for domains though)
 					}
 					msg += util.format('\n/u/%s | %d% (%d of %d rem) | %d% (%d of %d rem)',
-						user.user, trainerred.removalRate(user.all.removed, user.all.total), user.all.removed, user.all.total,
-						trainerred.removalRate(user.recent.removed, user.recent.total), user.recent.removed, user.recent.total)
+						user.user, user.all.rate, user.all.removed, user.all.total,
+						user.recent.rate, user.recent.removed, user.recent.total)
 				})
 				msg += '\n\n---\n### domains to review'
 				msg += '\n\ndomain | overall subs | recent subs\n---|:---:|:---:'
 				domains.forEach(function(domain) {
 					msg += util.format('\n[%s](https://www.reddit.com/domain/%s/) | %d% (%d of %d rem) | %d% (%d of %d rem)',
-						domain.domain, domain.domain, trainerred.removalRate(domain.all.removed, domain.all.total), domain.all.removed, domain.all.total,
-						trainerred.removalRate(domain.recent.removed, domain.recent.total), domain.recent.removed, domain.recent.total)
+						domain.domain, domain.domain, domain.all.rate, domain.all.removed, domain.all.total,
+						domain.recent.rate, domain.recent.removed, domain.recent.total)
 				})
-				console.log(msg)
 				/*
 				trainerred.modmail('TrainerRed Database updated', msg).then(function() {
 					output('modmail sent!')
@@ -270,25 +292,19 @@ module.exports = function(options) {
 								return
 							}
 
-							var ins = {
+							stdoutExport.users.push({
 								user: '/u/' + user.user,
 								recent: user.recent,
 								all: user.all,
-							}
-							ins.recent.rate = trainerred.removalRate(user.recent.removed, user.recent.total)
-							ins.all.rate = trainerred.removalRate(user.all.removed, user.all.total)
-							stdoutExport.users.push(ins)
+							})
 						})
 						domains.forEach(function(domain) {
-							var ins = {
+							stdoutExport.domains.push({
 								domain: domain.domain,
 								domainPage: 'https://www.reddit.com/domain/' + domain.domain,
 								recent: domain.recent,
 								all: domain.all
-							}
-							ins.recent.rate = trainerred.removalRate(domain.recent.removed, domain.recent.total)
-							ins.all.rate = trainerred.removalRate(domain.all.removed, domain.all.total)
-							stdoutExport.domains.push(ins)
+							})
 						})
 						stdoutExport = JSON.stringify(stdoutExport)
 					break
