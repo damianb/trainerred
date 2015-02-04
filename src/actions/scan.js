@@ -23,15 +23,7 @@ module.exports = function(options) {
 	}
 
 	// internal functions
-	var userReview = function(rows) {
-		var user = rows.author
-		if(!options.local) {
-			return trainerred.queryUser(user).fold(_userReview, user)
-		} else {
-			return _userReview(user)
-		}
-	},
-	_userReview = function(user) {
+	userReview = function(user) {
 		return when.join(
 			when.promise(function(resolve, reject) {
 				db.get('SELECT COUNT(id) as tCount FROM posts WHERE author = $user', { $user: user }, function(err, row) {
@@ -87,15 +79,7 @@ module.exports = function(options) {
 			}
 		})
 	},
-	domainReview = function(rows) {
-		var domain = rows.domain
-		if(!options.local) {
-			return trainerred.queryDomain(domain).fold(_domainReview, domain)
-		} else {
-			return _domainReview(domain)
-		}
-	},
-	_domainReview = function(domain) {
+	domainReview = function(domain) {
 		return when.join(
 			when.promise(function(resolve, reject) {
 				db.get('SELECT COUNT(id) as tCount FROM posts WHERE domain = $domain', { $domain: domain }, function(err, row) {
@@ -153,11 +137,13 @@ module.exports = function(options) {
 	}
 
 	// sanity enforcement. options.days has to be (1 <= days <= 14)
-	var dayWindow = options.days
+	var dayWindow = options.days,
+		earliestTime = null,
+		startTime = Date.now()
 	if(!dayWindow || (dayWindow < 1 || dayWindow > 14)) {
 		dayWindow = 7
 	}
-	var earliestTime = (Math.round(Date.now() / 1000) - (1 * 60 * 60 * 24 * dayWindow))
+	earliestTime = (Math.round(Date.now() / 1000) - (1 * 60 * 60 * 24 * dayWindow))
 
 	trainerred.auth()
 		.then(function() {
@@ -165,18 +151,19 @@ module.exports = function(options) {
 			if(!options.local) {
 				output('querying reddit...')
 
-				return trainerred.queryListing('/r/$subreddit/about/$location', {
-					$location: 'spam',
-					$subreddit: trainerred.subreddit,
-					only: 'links',
-					show: 'all'
-				}).then(function() {
-					return trainerred.queryListing('/r/$subreddit/new', {
+				return when.join(
+					trainerred.queryListing('/r/$subreddit/about/$location', {
+						$location: 'spam',
+						$subreddit: trainerred.subreddit,
+						only: 'links',
+						show: 'all'
+					}),
+					trainerred.queryListing('/r/$subreddit/new', {
 						$subreddit: trainerred.subreddit,
 						only: 'links',
 						show: 'all'
 					})
-				})
+				)
 			} else {
 				output('only scanning local records...')
 				return
@@ -230,90 +217,131 @@ module.exports = function(options) {
 					})
 				}),
 				// users to review
-				when.map(userPromise, userReview),
-				when.map(domainPromise, domainReview)
+				when.map(userPromise, function(rows) {
+					var user = rows.author
+					if(!options.local) {
+						return trainerred.queryUser(user).fold(userReview, user)
+					} else {
+						return userReview(user)
+					}
+				}),
+				// domains to review
+				when.map(domainPromise, function(rows) {
+					var domain = rows.domain
+					if(!options.local) {
+						return trainerred.queryDomain(domain).fold(domainReview, domain)
+					} else {
+						return domainReview(domain)
+					}
+				})
 			)
 		})
 		.then(function(res) {
 			// sigh, why does when.join have to be stupid...
-			var total = res[0], removed = res[1], users = res[2], domains = res[3]
-			output('done grabbing db entries, sending modmail')
+			var total = res[0], removed = res[1], users = res[2], domains = res[3],
+				overallRemovalRate = trainerred.removalRate(removed, total),
+				msg = ''
 
-			// note: this removal rate is only for recent submissions
-			var removalRate = trainerred.removalRate(removed, total)
+			output('done grabbing db entries, generating report')
 
-			// todo: REARRANGE! If we do the creation of stdoutExport first, we can actually just reuse the object's formatting right there.
-			// Saves us parsing, makes the code clearer.
+			var report = {
+				overview: {
+					total: total,
+					removed: removed,
+					rate: overallRemovalRate
+				},
+				users: [],
+				domains: []
+			}
+			users.forEach(function(user) {
+				if(user.all.removed === 1) {
+					return
+				}
+
+				report.users.push({
+					user: '/u/' + user.user,
+					recent: user.recent,
+					all: user.all,
+				})
+			})
+			domains.forEach(function(domain) {
+				report.domains.push({
+					domain: domain.domain,
+					domainPage: 'https://www.reddit.com/domain/' + domain.domain,
+					recent: domain.recent,
+					all: domain.all
+				})
+			})
+
 			if(options.mail) {
-				var msg = '## TrainerRed initial database population complete.'
-				msg += '\n\nTrainerRed has identified ' + total + ' entries (' + removed + ' removals; ' + trainerred.removalRate(removed, total) + '% removal rate) within the last 7 days for analysis.'
+				msg = '## TrainerRed scan complete.'
+				msg += '\n\nTrainerRed has identified ' + report.overview.total + ' entries (' + report.overview.removed + ' removals; '
+				msg += report.overview.rate + '% removal rate) within the last ' + daysWithin + ' days for analysis.'
+
 				msg += '\n\n---\n### users to review'
 				msg += '\n\nsubmitter | overall subs | recent subs\n---|:---:|:---:'
 				users.forEach(function(user) {
 					if(user.all.removed === 1) {
 						return // pass on this one, we don't need to care about first-struck users (we don't do the same for domains though)
 					}
-					msg += util.format('\n/u/%s | %d% (%d of %d rem) | %d% (%d of %d rem)',
+					msg += util.format('\n%s | %d% (%d of %d rem) | %d% (%d of %d rem)',
 						user.user, user.all.rate, user.all.removed, user.all.total,
 						user.recent.rate, user.recent.removed, user.recent.total)
 				})
+
 				msg += '\n\n---\n### domains to review'
 				msg += '\n\ndomain | overall subs | recent subs\n---|:---:|:---:'
 				domains.forEach(function(domain) {
-					msg += util.format('\n[%s](https://www.reddit.com/domain/%s/) | %d% (%d of %d rem) | %d% (%d of %d rem)',
-						domain.domain, domain.domain, domain.all.rate, domain.all.removed, domain.all.total,
+					msg += util.format('\n[%s](%s/) | %d% (%d of %d rem) | %d% (%d of %d rem)',
+						domain.domain, domain.domainPage, domain.all.rate, domain.all.removed, domain.all.total,
 						domain.recent.rate, domain.recent.removed, domain.recent.total)
 				})
-				/*
+
+				msg += '\n\n---\nScan started at ' + startTime + '\n\nScan completed at ' + Date.now()
+
 				trainerred.modmail('TrainerRed Database updated', msg).then(function() {
 					output('modmail sent!')
 				})
-				*/
 			}
 
 			// do we want to format the report and print it over stdout?
 			// todo: other formatting options for stdout (csv?)
 			// note: we're ignoring output() here and using console.log straight
-			var stdoutExport = ''
 			if(!options.export) {
 				switch(options.export) {
 					case 'json':
-						stdoutExport = {
-							overview: {
-								total: total,
-								removals: removed,
-								removalRate: removalRate
-							},
-							users: [],
-							domains: []
-						}
-						users.forEach(function(user) {
-							if(user.all.removed === 1) {
-								return
-							}
-
-							stdoutExport.users.push({
-								user: '/u/' + user.user,
-								recent: user.recent,
-								all: user.all,
-							})
-						})
-						domains.forEach(function(domain) {
-							stdoutExport.domains.push({
-								domain: domain.domain,
-								domainPage: 'https://www.reddit.com/domain/' + domain.domain,
-								recent: domain.recent,
-								all: domain.all
-							})
-						})
-						stdoutExport = JSON.stringify(stdoutExport)
+						// well, that was easy
+						console.log(JSON.stringify(report))
 					break
 					case 'standard':
 					default:
-						// todo - stdout formatting
+						msg = '\nTrainerRed scan complete'
+						msg += '\n\nTrainerRed has identified ' + report.overview.total + ' entries (' + report.overview.removed + ' removals; '
+						msg += report.overview.rate + '% removal rate) within the last ' + daysWithin + ' days for analysis.'
+
+						msg += '\n\n------------------------\nusers to review\n------------------------'
+						msg += '\n\nsubmitter | overall subs | recent subs'
+						users.forEach(function(user) {
+							if(user.all.removed === 1) {
+								return // pass on this one, we don't need to care about first-struck users (we don't do the same for domains though)
+							}
+							msg += util.format('\n%s | %d% (%d of %d rem) | %d% (%d of %d rem)',
+							user.user, user.all.rate, user.all.removed, user.all.total,
+							user.recent.rate, user.recent.removed, user.recent.total)
+						})
+
+						msg += '\n\n------------------------\ndomains to review\n------------------------'
+						msg += '\n\ndomain | overall subs | recent subs'
+						domains.forEach(function(domain) {
+							msg += util.format('\n%s - %s/ | %d% (%d of %d rem) | %d% (%d of %d rem)',
+							domain.domain, domain.domainPage, domain.all.rate, domain.all.removed, domain.all.total,
+							domain.recent.rate, domain.recent.removed, domain.recent.total)
+						})
+
+						msg += '\n\n------------------------\nScan started at ' + startTime + '\n\nScan completed at ' + Date.now()
+						console.log(msg)
 					break
 				}
-				console.log(stdoutExport)
 			}
 			output('terminating...')
 			return
