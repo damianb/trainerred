@@ -23,7 +23,7 @@ cli.command('populate')
 	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		var action = require('./src/actions/populate')(cli) // hope this works... x.x;
+		var action = require('./src/actions/populate')(this)
 	})
 
 cli.command('scan')
@@ -36,7 +36,7 @@ cli.command('scan')
 	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		var action = require('./src/actions/scan')(cli)
+		var action = require('./src/actions/scan')(this)
 	})
 
 cli.command('domain <domain>')
