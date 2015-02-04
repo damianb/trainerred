@@ -6,15 +6,15 @@
   "author": "Damian Bushong <katana@odios.us>",
   "license": "MIT License",
   "dependencies": {
-    "nconf": "^0.6.9",
-    "snoocore": "^2.4.0",
-    "sqlite3": "^3.0.2",
-    "commander": "^2.3.0"
+    "nconf": "^0.7.1",
+    "snoocore": "^2.4.1",
+    "sqlite3": "^3.0.4",
+    "commander": "^2.6.0"
   },
   "engines": {
     "node": ">=0.11"
   },
   "bin": {
-    "trainerred" : "./cli.js"
+    "trainerred" : "./trainerred.js"
   }
 }
