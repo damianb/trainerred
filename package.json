@@ -1,6 +1,6 @@
 {
   "name": "trainerred",
-  "version": "0.5.0",
+  "version": "1.0.0a1",
   "description": "subreddit submission data analysis",
   "main": "index.js",
   "author": "Damian Bushong <katana@odios.us>",
