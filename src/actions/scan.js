@@ -276,7 +276,7 @@ module.exports = function(options) {
 			if(options.mail) {
 				msg = '## TrainerRed scan complete.'
 				msg += '\n\nTrainerRed has identified ' + report.overview.total + ' entries (' + report.overview.removed + ' removals; '
-				msg += report.overview.rate + '% removal rate) within the last ' + daysWithin + ' days for analysis.'
+				msg += report.overview.rate + '% removal rate) within the last ' + dayWindow + ' days for analysis.'
 
 				msg += '\n\n---\n### users to review'
 				msg += '\n\nsubmitter | overall subs | recent subs\n---|:---:|:---:'
