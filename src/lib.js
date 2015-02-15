@@ -64,6 +64,7 @@ function TrainerRed(configName, dbName) {
 	api.when = when
 	api.subreddit = subreddit
 	api.db = db
+	api.pkg = pkg
 
 	// externally provided methods
 	api.auth = function() {
@@ -137,7 +138,7 @@ function TrainerRed(configName, dbName) {
 
 	api.queryUser = function(user) {
 		// for some reason, this endpoint also requires raw mode. sigh.
-		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }, true).then(function() {
+		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }).then(function() {
 			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
 
 			var params = { $username: user, $last_scanned: Date.now() }
@@ -158,7 +159,7 @@ function TrainerRed(configName, dbName) {
 		return reddit("/api/compose").post({
 			api_type: 'json',
 			subject: title,
-			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version,
+			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + ' on ' + process.title + ' ' + process.version + ' (' + process.arch + ')',
 			to: '/r/' + subreddit
 		})
 	}
