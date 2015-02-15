@@ -28,7 +28,7 @@ cli.command('populate')
 
 cli.command('scan')
 	.description('run TrainerRed in periodic scan mode, creating a report via moderator mail')
-	.option('-d. --days <days>', 'number of days of material to use in the report, default 7')
+	.option('-d, --days <days>', 'number of days of material to use in the report, default 7')
 	.option('--no-mail', 'do not send modmail report')
 	.option('--export [format]', 'output a specific format for the stdout version of the report (valid: "standard", "json"; default "standard")')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
