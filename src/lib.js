@@ -9,7 +9,10 @@
 // @twitter <https://twitter.com/blazingcrimson>
 //
 
-var	nconf = require('nconf'),
+var	fs = require('fs'),
+	path = require('path'),
+	pExec = require('child_process').execSync,
+	nconf = require('nconf'),
 	sqlite = require('sqlite3').verbose(),
 	pkg = require(__dirname + '/../package.json'),
 	snoocore = require('snoocore'),
@@ -60,11 +63,19 @@ function TrainerRed(configName, dbName) {
 			}
 		})
 
+	var sha = ''
+	if(fs.existsSync(path.normalize(__dirname + '/../.git'))) {
+		try {
+			sha = '(' + pExec('git rev-parse HEAD', { cwd: path.normalize(__dirname + '/../'), timeout: 500 }).slice(0,8) + ')'
+		} catch(e) {}
+	}
+
 	// expose when, sr info
 	api.when = when
 	api.subreddit = subreddit
 	api.db = db
 	api.pkg = pkg
+	api.sha = sha
 
 	// externally provided methods
 	api.auth = function() {
@@ -159,7 +170,7 @@ function TrainerRed(configName, dbName) {
 		return reddit("/api/compose").post({
 			api_type: 'json',
 			subject: title,
-			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + ' on ' + process.title + ' ' + process.version + ' (' + process.arch + ')',
+			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + process.title + ' ' + process.version + ' (' + process.arch + ')',
 			to: '/r/' + subreddit
 		})
 	}
