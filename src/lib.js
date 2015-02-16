@@ -63,7 +63,8 @@ function TrainerRed(configName, dbName) {
 			}
 		})
 
-	var sha = ''
+	var sha = '',
+		nodeBinary = path.basename(process.execPath)
 	if(fs.existsSync(path.normalize(__dirname + '/../.git'))) {
 		try {
 			sha = '(' + pExec('git rev-parse HEAD', { cwd: path.normalize(__dirname + '/../'), timeout: 500 }).slice(0,8) + ')'
@@ -76,6 +77,7 @@ function TrainerRed(configName, dbName) {
 	api.db = db
 	api.pkg = pkg
 	api.sha = sha
+	api.nodeBinary = nodeBinary
 
 	// externally provided methods
 	api.auth = function() {
@@ -170,7 +172,7 @@ function TrainerRed(configName, dbName) {
 		return reddit("/api/compose").post({
 			api_type: 'json',
 			subject: title,
-			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + process.title + ' ' + process.version + ' (' + process.arch + ')',
+			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + nodeBinary + ' ' + process.version + ' (' + process.arch + ')',
 			to: '/r/' + subreddit
 		})
 	}
