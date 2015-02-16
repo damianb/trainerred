@@ -338,8 +338,8 @@ module.exports = function(options) {
 							domain.recent.rate, domain.recent.removed, domain.recent.total)
 						})
 
-						msg += '\n\n------------------------\nScan started at ' + startTime + '\n\nScan completed at ' + new Date()
-						msg += '\n\n------------------------\nRunning TrainerRed v' + trainerred.pkg.version + trainerred.sha + ' on ' + trainerred.nodeBinary + ' ' + process.version + ' (' + process.arch + ')'
+						msg += '\n\n------------------------\nScan started at ' + startTime + '\nScan completed at ' + new Date()
+						msg += '\nRunning TrainerRed v' + trainerred.pkg.version + trainerred.sha + ' on ' + trainerred.nodeBinary + ' ' + process.version + ' (' + process.arch + ')'
 						console.log(msg)
 					break
 				}
