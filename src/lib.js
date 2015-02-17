@@ -151,7 +151,7 @@ function TrainerRed(configName, dbName) {
 
 	api.queryUser = function(user) {
 		// for some reason, this endpoint also requires raw mode. sigh.
-		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }).then(function() {
+		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }, true).then(function() {
 			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
 
 			var params = { $username: user, $last_scanned: Date.now() }
