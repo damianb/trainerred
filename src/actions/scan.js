@@ -131,12 +131,12 @@ module.exports = function(options) {
 						$subreddit: trainerred.subreddit,
 						only: 'links',
 						show: 'all'
-					}),
+					}, { depth: 300 }),
 					trainerred.queryListing('/r/$subreddit/new', {
 						$subreddit: trainerred.subreddit,
 						only: 'links',
 						show: 'all'
-					})
+					}, { depth: 300 })
 				)
 			} else {
 				output('only scanning local records...')
