@@ -23,7 +23,7 @@ cli.command('populate')
 	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		var action = require('./src/actions/populate')(this)
+		require('./src/actions/populate')(this)
 	})
 
 cli.command('scan')
@@ -36,7 +36,7 @@ cli.command('scan')
 	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
 	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
-		var action = require('./src/actions/scan')(this)
+		require('./src/actions/scan')(this)
 	})
 
 cli.command('domain <domain>')
@@ -67,7 +67,7 @@ cli.command('overview')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
 	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
 	.action(function() {
-		// todo
+		require('./src/actions/overview')(this)
 	})
 
 cli.command('setup')
