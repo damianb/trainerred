@@ -10,11 +10,15 @@
 //
 
 module.exports = function(options) {
-	var output = !!options.quiet ? function() {} || console.log,
-		trainerred = require('./../lib')(options.config, options.db),
+	var trainerred = require('./../lib')(options.config, options.db),
 		db = trainerred.db,
 		when = trainerred.when,
-		util = require('util')
+		util = require('util'),
+		output = function() {}
+
+	if(!options.quiet) {
+		output = console.log
+	}
 
 	// internal functions
 	var userReview = function(user) {

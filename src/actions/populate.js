@@ -10,10 +10,14 @@
 //
 
 module.exports = function(options) {
-	var output = !!options.quiet ? function() {} || console.log,
-		trainerred = require('./../lib')(options.config, options.db),
+	var trainerred = require('./../lib')(options.config, options.db),
 		db = trainerred.db,
-		when = trainerred.when
+		when = trainerred.when,
+		output = function() {}
+
+	if(!options.quiet) {
+		output = console.log
+	}
 
 	// sanity check options before takeoff
 	if(!options.depth || (options.depth < 100 || options.depth > 1000)) {
