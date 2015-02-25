@@ -28,7 +28,6 @@ function TrainerRed(configName, dbName) {
 		subreddit = nconf.get('subreddit'),
 		exitOnError = nconf.get('fatalOnError'),
 		// general purpose var here for query depth, maximum fetch size (reddit only allows up to 100, mind)
-		depth = 200,
 		maxFetch = 100
 
 	// some call this "error handling"
@@ -91,26 +90,20 @@ function TrainerRed(configName, dbName) {
 				+ 'approved_by VARCHAR(32), author VARCHAR(32) NOT NULL, url VARCHAR(255) NOT NULL, '
 				+ 'created_utc INTEGER NOT NULL, permalink VARCHAR(255) NOT NULL, _removed INTEGER NOT NULL,'
 				+ '_last_touched INTEGER NOT NULL)', function(err) {
-				if(err) {
-					return reject(err)
-				}
-				resolve(true)
+					if(err) return reject(err)
+					resolve(true)
 			})
 		}).then(when.promise(function(resolve, reject) {
 			db.run('CREATE TABLE IF NOT EXISTS userscans ('
 				+ 'username VARCHAR(32) UNIQUE NOT NULL, last_scanned INTEGER NOT NULL)', function(err) {
-				if(err) {
-					return reject(err)
-				}
-				resolve(true)
+					if(err) return reject(err)
+					resolve(true)
 			})
 		})).then(when.promise(function(resolve, reject) {
 			db.run('CREATE TABLE IF NOT EXISTS domainscans ('
 				+ 'domain VARCHAR(100) UNIQUE NOT NULL, last_scanned INTEGER NOT NULL)', function(err) {
-				if(err) {
-					return reject(err)
-				}
-				resolve(true)
+					if(err) return reject(err)
+					resolve(true)
 			})
 		}))
 	}
@@ -120,49 +113,49 @@ function TrainerRed(configName, dbName) {
 		return reddit('/api/v1/me').get()
 	}
 
-	api.queryListing = function(uri, params, _depth) {
-		return iterative(_depth || depth, uri, params)
-	}
-
 	api.queryDomain = function(domain) {
 		// /domain/:domain is undocumented and therefore unsupported by reddit-api-generator
 		// ...and therefore unsupported by snoocore, meaning we have to be a hacky asshole for this shit to work.
 		// a damn shame, since this makes the iterative function even MORE of an ugly mess, but oh well.
-		// once this endpoint is properly documented (and oauth-supported) we'll be able to get rid of raw mode in iterative()
+		// once this endpoint is properly documented (and oauth-supported) we'll be able to get rid of raw mode in queryListing()
 		//
 		// reference github issue: reddit/reddit#1147
 		//
-		return iterative(depth, 'https://www.reddit.com/domain/$domain/new.json', { $domain: domain }, true).then(function() {
+		return queryListing('https://www.reddit.com/domain/$domain/new.json', { $domain: domain },
+		{ raw: true, depth: 200 }).then(function() {
 			var sql = 'INSERT OR IGNORE INTO domainscans (domain, last_scanned) VALUES ($domain, $last_scanned)'
 
 			var params = { $domain: domain, $last_scanned: Date.now() }
 			db.run(sql, params, function(err) {
-				if(err) {
-					return onError(err)
-				}
+				if(err) return onError(err)
 
 				if(!this.lastID) {
-					sql = 'UPDATE domainscans SET last_scanned = $last_scanned WHERE domain = $domain'
-					db.run(sql, params)
+					db.run('UPDATE domainscans SET last_scanned = $last_scanned WHERE domain = $domain', params)
 				}
 			})
 		})
 	}
 
+	var queryUserErrorHandler = function(err) {
+		if(err.status === 404) {
+			// pass, shadowbanned user
+		} else {
+			console.error(err)
+		}
+	}
+
 	api.queryUser = function(user) {
 		// for some reason, this endpoint also requires raw mode. sigh.
-		return iterative(depth, 'https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' }, true).then(function() {
+		return queryListing('https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' },
+			{ raw: true, depth: 200, errorHandler: queryUserErrorHandler }).then(function() {
 			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
 
 			var params = { $username: user, $last_scanned: Date.now() }
 			db.run(sql, params, function(err) {
-				if(err) {
-					return onError(err)
-				}
+				if(err) return onError(err)
 
 				if(!this.lastID) {
-					sql = 'UPDATE userscans SET last_scanned = $last_scanned WHERE username = $username'
-					db.run(sql, params)
+					db.run('UPDATE userscans SET last_scanned = $last_scanned WHERE username = $username', params)
 				}
 			})
 		})
@@ -186,14 +179,20 @@ function TrainerRed(configName, dbName) {
 	// here be dragons!
 	// ...i'm serious.
 	//
-	// the following method is private, not to be publicly accessed because i said so
-	//
-	// also, a huge shout out to gh user trevorsenior for adding the listing feature to snoocore.
+	// also, huge shout out to gh user trevorsenior for adding the listing feature to snoocore.
 	// said feature made this function FAR simpler in the end and probably dropped the size of the code by half.
 	//
-	var iterative = function(depth, uri, params, raw) {
+	// options param properties:
+	//  depth: how far to go in the iterative query
+	//  raw: should this use raw mode?
+	//  queryOptions: options object to pass to snoocore for the query (such as overrides)
+	//  errorHandler: API query errorHandler override, useful for when we're dealing with users (and shadowbanned users 404'ing)
+	//
+	var queryListing = api.queryListing = function(uri, params, options) {
 		var ret = [],
-			queryOptions = {}
+			queryOptions = options.queryOptions || {},
+			depth = options.depth || 200,
+			errorHandler = options.errorHandler || console.error
 
 		if(!params.limit) {
 			params.limit = maxFetch
@@ -202,7 +201,7 @@ function TrainerRed(configName, dbName) {
 		// ugly hack around the domain/:domain/ thing mentioned above not being available.
 		// this is the heart of the iterative "raw mode". maybe sometime soon we'll be able to remove it.
 		var queryFn = function() {
-			if(raw === true) {
+			if(options.raw === true) {
 				queryOptions = { bypassAuth: true }
 				return reddit.raw(uri)
 			}
@@ -218,14 +217,7 @@ function TrainerRed(configName, dbName) {
 			function(slice) { return (slice.count >= depth || !!slice.empty ) },
 			function(slice) { return },
 			queryFn().listing(params, queryOptions)
-		).catch(function(err) {
-			// going to be passive about errors here, since there seems to be shenanigans with user pages
-			// probably something to do with shadowbanned users, but idk.
-			// reddit also occasionally has seizures that result in everything going down, but that's not something we can do much about.
-			//
-			// in the future, we might want to abort on any 50X errors, but we'll leave it alone for now and let the user panic and ^C instead
-			console.error(err)
-		})
+		).catch(errorHandler)
 	}
 
 	// dragons here too. careful now.
@@ -265,9 +257,7 @@ function TrainerRed(configName, dbName) {
 		sql += 'VALUES ($id, $banned_by, $domain, $approved_by, $author, $url, $created_utc, $permalink, $_removed, $_last_touched)'
 
 		db.run(sql, child, function(err) {
-			if(err) {
-				return onError(err)
-			}
+			if(err) return onError(err)
 
 			if(!this.lastID) {
 				sql = 'UPDATE posts SET banned_by = $banned_by, approved_by = $approved_by, _removed = $_removed, _last_touched = $_last_touched'
@@ -288,4 +278,3 @@ function TrainerRed(configName, dbName) {
 }
 
 module.exports = TrainerRed
-module.exports.when = when

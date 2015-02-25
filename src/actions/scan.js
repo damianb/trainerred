@@ -10,57 +10,39 @@
 //
 
 module.exports = function(options) {
-	var trainerred = require('./../lib')(options.config, options.db),
+	var output = !!options.quiet ? function() {} || console.log,
+		trainerred = require('./../lib')(options.config, options.db),
 		db = trainerred.db,
 		when = trainerred.when,
-		util = require('util'),
-		output = null
-
-	if(options.quiet) {
-		output = function() {}
-	} else {
-		output = console.log
-	}
+		util = require('util')
 
 	// internal functions
 	var userReview = function(user) {
 		return when.join(
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as tCount FROM posts WHERE author = $user', { $user: user }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.tCount)
+				db.get('SELECT COUNT(id) as count FROM posts WHERE author = $user', { $user: user }, function(err, row) {
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			}),
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as rCount FROM posts WHERE author = $user AND _removed = 1', { $user: user }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.rCount)
+				db.get('SELECT COUNT(id) as count FROM posts WHERE author = $user AND _removed = 1', { $user: user }, function(err, row) {
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			}),
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as rec_tCount FROM posts WHERE author = $user'
+				db.get('SELECT COUNT(id) as count FROM posts WHERE author = $user'
 				+ ' AND created_utc > $earliestTime', { $user: user, $earliestTime: earliestTime }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.rec_tCount)
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			}),
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as rec_rCount FROM posts WHERE author = $user AND _removed = 1'
+				db.get('SELECT COUNT(id) as count FROM posts WHERE author = $user AND _removed = 1'
 				+ ' AND created_utc > $earliestTime', { $user: user, $earliestTime: earliestTime }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.rec_rCount)
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			})
 		).then(function(val) {
@@ -82,41 +64,29 @@ module.exports = function(options) {
 	domainReview = function(domain) {
 		return when.join(
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as tCount FROM posts WHERE domain = $domain', { $domain: domain }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.tCount)
+				db.get('SELECT COUNT(id) as count FROM posts WHERE domain = $domain', { $domain: domain }, function(err, row) {
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			}),
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as rCount FROM posts WHERE domain = $domain AND _removed = 1', { $domain: domain }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.rCount)
+				db.get('SELECT COUNT(id) as count FROM posts WHERE domain = $domain AND _removed = 1', { $domain: domain }, function(err, row) {
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			}),
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as rec_tCount FROM posts WHERE domain = $domain'
+				db.get('SELECT COUNT(id) as count FROM posts WHERE domain = $domain'
 				+ ' AND created_utc > $earliestTime', { $domain: domain, $earliestTime: earliestTime }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.rec_tCount)
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			}),
 			when.promise(function(resolve, reject) {
-				db.get('SELECT COUNT(id) as rec_rCount FROM posts WHERE domain = $domain AND _removed = 1'
+				db.get('SELECT COUNT(id) as count FROM posts WHERE domain = $domain AND _removed = 1'
 				+ ' AND created_utc > $earliestTime', { $domain: domain, $earliestTime: earliestTime }, function(err, row) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(row.rec_rCount)
+					if(err) return reject(err)
+					resolve(row.count)
 				})
 			})
 		).then(function(val) {
@@ -176,22 +146,16 @@ module.exports = function(options) {
 			var userPromise = when.promise(function(resolve, reject) {
 				db.all('SELECT author FROM posts WHERE _removed = 1 AND created_utc > $earliestTime'
 					+ ' GROUP BY author ORDER BY COUNT(author) DESC LIMIT 10', params, function(err, rows) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(rows)
+						if(err) return reject(err)
+						resolve(rows)
 				})
 			})
 
 			var domainPromise = when.promise(function(resolve, reject) {
 				db.all('SELECT domain FROM posts WHERE _removed = 1 AND created_utc > $earliestTime'
 					+ ' GROUP BY domain ORDER BY COUNT(domain) DESC LIMIT 10', params, function(err, rows) {
-					if(err) {
-						return reject(err)
-					}
-
-					resolve(rows)
+						if(err) return reject(err)
+						resolve(rows)
 				})
 			})
 
@@ -199,20 +163,14 @@ module.exports = function(options) {
 				// total posts submitted within the last week
 				when.promise(function(resolve, reject) {
 					db.get('SELECT COUNT(id) as count FROM posts WHERE created_utc > $earliestTime', params, function(err, row) {
-						if(err) {
-							return reject(err)
-						}
-
+						if(err) return reject(err)
 						resolve(row.count)
 					})
 				}),
 				// total posts REMOVED within the last week
 				when.promise(function(resolve, reject) {
 					db.get('SELECT COUNT(id) as count FROM posts WHERE _removed = 1 AND created_utc > $earliestTime', params, function(err, row) {
-						if(err) {
-							return reject(err)
-						}
-
+						if(err) return reject(err)
 						resolve(row.count)
 					})
 				}),
