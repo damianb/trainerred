@@ -4,10 +4,15 @@
   "description": "subreddit submission data analysis",
   "main": "index.js",
   "author": "Damian Bushong <katana@odios.us>",
+  "homepage": "https://github.com/damianb/trainerred",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/damianb/trainerred.git"
+  },
   "license": "MIT License",
   "dependencies": {
     "nconf": "^0.7.1",
-    "snoocore": "^2.5.0",
+    "snoocore": "^2.7.0",
     "sqlite3": "^3.0.4",
     "commander": "^2.6.0"
   },
