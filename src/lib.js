@@ -191,9 +191,9 @@ function TrainerRed(configName, dbName) {
 	var queryListing = api.queryListing = function(uri, params, options) {
 		var ret = [],
 			options = options || {}
-			queryOptions = options.queryOptions || {},
-			depth = options.depth || 200,
-			errorHandler = options.errorHandler || console.error
+			queryOptions = options.queryOptions ? options.queryOptions : {},
+			depth = options.depth ? options.depth : 200,
+			errorHandler = options.errorHandler ? options.errorHandler : console.error
 
 		if(!params.limit) {
 			params.limit = maxFetch
