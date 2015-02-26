@@ -137,7 +137,7 @@ function TrainerRed(configName, dbName) {
 	}
 
 	var queryUserErrorHandler = function(err) {
-		if(err.httpStatus && err.httpStatus === 404) {
+		if(err.status && err.status === 404) {
 			// pass, shadowbanned user
 		} else {
 			console.error(err)
