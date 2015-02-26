@@ -165,7 +165,7 @@ function TrainerRed(configName, dbName) {
 		return reddit("/api/compose").post({
 			api_type: 'json',
 			subject: title,
-			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + nodeBinary + ' ' + process.version + ' (' + process.arch + ')',
+			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + nodeBinary + ' ' + process.version,
 			to: '/r/' + subreddit
 		})
 	}

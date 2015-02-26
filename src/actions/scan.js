@@ -301,7 +301,7 @@ module.exports = function(options) {
 						})
 
 						msg += '\n\n------------------------\nScan started at ' + startTime + '\nScan completed at ' + new Date()
-						msg += '\nRunning TrainerRed v' + trainerred.pkg.version + trainerred.sha + ' on ' + trainerred.nodeBinary + ' ' + process.version + ' (' + process.arch + ')'
+						msg += '\nRunning TrainerRed v' + trainerred.pkg.version + trainerred.sha + ' on ' + trainerred.nodeBinary + ' ' + process.version
 						console.log(msg)
 					break
 				}
