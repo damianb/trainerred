@@ -117,7 +117,8 @@ module.exports = function(options) {
 	if(!dayWindow || (dayWindow < 1 || dayWindow > 14)) {
 		dayWindow = 7
 	}
-	earliestTime = (Math.round(Date.now() / 1000) - (1 * 60 * 60 * 24 * dayWindow))
+	// *ominous hand waving during $earliestTime conjuration*
+	var earliestTime = (Math.round(Date.now() / 1000) - (1 * 60 * 60 * 24 * dayWindow))
 
 	trainerred.auth()
 		.then(function() {
@@ -127,8 +128,8 @@ module.exports = function(options) {
 
 				return when.join(
 					trainerred.queryListing('/r/$subreddit/about/$location', {
-						$location: 'spam',
 						$subreddit: trainerred.subreddit,
+						$location: 'spam',
 						only: 'links',
 						show: 'all'
 					}, { depth: 300 }),
@@ -144,7 +145,6 @@ module.exports = function(options) {
 			}
 		})
 		.then(function() {
-			// *ominous hand waving during $earliestTime conjuration*
 			var params = { $earliestTime: earliestTime }
 
 			var userPromise = when.promise(function(resolve, reject) {
@@ -223,7 +223,7 @@ module.exports = function(options) {
 				report.users.push({
 					user: '/u/' + user.user,
 					recent: user.recent,
-					all: user.all,
+					all: user.all
 				})
 			})
 			domains.forEach(function(domain) {

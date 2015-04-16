@@ -74,8 +74,6 @@ cli.command('setup')
 	.description('setup prompts for required config values, builds config file')
 	.option('--config <config>', 'the configuration file to use (defaults to "config.json")')
 	.option('--db <db>', 'the database file to use (defaults to "trainerred.db")')
-	.option('--local', 'do not query the reddit api for additional information, just rely on the local database')
-	.option('-q, --quiet', 'silence informational console messages')
 	.action(function() {
 		// todo
 	})
