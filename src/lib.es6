@@ -31,27 +31,27 @@ if(fs.existsSync(path.normalize(__dirname + '/../.git'))) {
 	} catch(e) {}
 }
 
-let subreddit = ''
-let exitOnError = true
-let db = null
-
-// export the init function.
-export default function TrainerRed(configFile, dbFile) {
-	nconf
-		.argv()
-		.env()
-		.file({ file: (configFile || './../config.json') })
-	subreddit = nconf.get('subreddit')
-	exitOnError = nconf.get('fatalOnError')
+function queryUserErrorHandler(err) {
+	if(err.status && err.status === 404) {
+		// pass, shadowbanned user
+	} else {
+		console.error(err)
+	}
 }
-
-export var db
 
 class TrainerRed {
 	constructor(configFile, dbFile) {
+		nconf
+			.argv()
+			.env()
+			.file({ file: (configFile || './../config.json') })
+
+		this.dbFile = dbFile
 		this.subreddit = nconf.get('subreddit')
 		this.exitOnError = nconf.get('fatalOnError')
-		this.db = new sqlite.Database(dbFile || './../trainerred.db')
+		// null this for the time being, we'll lazy load it
+		this.db = null
+
 		this.reddit = new snoocore({
 			userAgent: 'TrainerRed v' + pkg.version + ' - /r/' + subreddit,
 			throttle: 5000, // bigger delay for our script, since we're querying harder than most things do
@@ -72,8 +72,14 @@ class TrainerRed {
 				]
 			}
 		})
+	}
 
-		get db()
+	get db() {
+		if(!this.db) {
+			this.db = new sqlite.Database(dbFile || './../trainerred.db')
+		}
+
+		return this.db
 	}
 
 	onError(error, crit) {
@@ -92,24 +98,25 @@ class TrainerRed {
 
 	// prepare db tables
 	setTable() {
+		let self = this
 		return when.promise(function(resolve, reject) {
-			db.run('CREATE TABLE IF NOT EXISTS posts ('
+			self.db.run('CREATE TABLE IF NOT EXISTS posts ('
 				+ 'id CHAR(15) UNIQUE NOT NULL, banned_by VARCHAR(32), domain VARCHAR(100) NOT NULL, '
 				+ 'approved_by VARCHAR(32), author VARCHAR(32) NOT NULL, url VARCHAR(255) NOT NULL, '
 				+ 'created_utc INTEGER NOT NULL, permalink VARCHAR(255) NOT NULL, _removed INTEGER NOT NULL,'
 				+ '_last_touched INTEGER NOT NULL)', (err) => if(err) { return reject(err) } else { resolve(true) }
 		}).then(when.promise(function(resolve, reject) {
-			db.run('CREATE TABLE IF NOT EXISTS userscans ('
+			self.db.run('CREATE TABLE IF NOT EXISTS userscans ('
 				+ 'username VARCHAR(32) UNIQUE NOT NULL, last_scanned INTEGER NOT NULL)', (err) => if(err) { return reject(err) } else { resolve(true) } )
 		})).then(when.promise(function(resolve, reject) {
-			db.run('CREATE TABLE IF NOT EXISTS domainscans ('
+			self.db.run('CREATE TABLE IF NOT EXISTS domainscans ('
 				+ 'domain VARCHAR(100) UNIQUE NOT NULL, last_scanned INTEGER NOT NULL)', (err) => if(err) { return reject(err) } else { resolve(true) } )
 		}))
 	}
 
 	// get our user info
 	papers() {
-		return reddit('/api/v1/me').get()
+		return this.reddit('/api/v1/me').get()
 	}
 
 	queryDomain(domain) {
@@ -126,10 +133,35 @@ class TrainerRed {
 				if(err) return onError(err)
 
 				if(!this.lastID) {
-					db.run('UPDATE domainscans SET last_scanned = $last_scanned WHERE domain = $domain', params)
+					self.db.run('UPDATE domainscans SET last_scanned = $last_scanned WHERE domain = $domain', params)
 				}
 			})
 		)
+	}
+
+	queryUser(user) {
+		let self = this
+		// for some reason, this endpoint also requires raw mode. sigh.
+		return this.queryListing('https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' },
+			{ raw: true, depth: 200, errorHandler: queryUserErrorHandler }).then(function() {
+			let params = { $username: user, $last_scanned: Date.now() }
+			self.db.run('INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)', params, function(err) {
+				if(err) return onError(err)
+
+				if(!this.lastID) {
+					self.db.run('UPDATE userscans SET last_scanned = $last_scanned WHERE username = $username', params)
+				}
+			})
+		})
+	}
+
+	modmail(title, message) {
+		return this.reddit("/api/compose").post({
+			api_type: 'json',
+			subject: title,
+			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + nodeBinary + ' ' + process.version,
+			to: '/r/' + this.subreddit
+		})
 	}
 }
 
@@ -147,30 +179,7 @@ export { when } from 'snoocore'
 
 function TrainerRed(configName, dbName) {
 
-	var queryUserErrorHandler = function(err) {
-		if(err.status && err.status === 404) {
-			// pass, shadowbanned user
-		} else {
-			console.error(err)
-		}
-	}
-
-	api.queryUser = function(user) {
-		// for some reason, this endpoint also requires raw mode. sigh.
-		return queryListing('https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' },
-			{ raw: true, depth: 200, errorHandler: queryUserErrorHandler }).then(function() {
-			var sql = 'INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)'
-
-			var params = { $username: user, $last_scanned: Date.now() }
-			db.run(sql, params, function(err) {
-				if(err) return onError(err)
-
-				if(!this.lastID) {
-					db.run('UPDATE userscans SET last_scanned = $last_scanned WHERE username = $username', params)
-				}
-			})
-		})
-	}
+	api
 
 	api.modmail = function(title, message) {
 		return reddit("/api/compose").post({
