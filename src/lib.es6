@@ -1,4 +1,3 @@
-'use strict'
 //
 // TrainerRed - subreddit submission analysis bot
 // ---
@@ -17,6 +16,7 @@ import sqlite as _sqlite from 'sqlite3'
 import snoocore, { when } from 'snoocore'
 
 let pkg = require('./../package.json')
+// todo see if we rerally do need verbose errors from sqlite3 now
 let sqlite = _sqlite.verbose()
 
 // general purpose var here for query depth, maximum fetch size (reddit only allows up to 100, mind)
@@ -55,14 +55,12 @@ class TrainerRed {
 		this.reddit = new snoocore({
 			userAgent: 'TrainerRed v' + pkg.version + ' - /r/' + subreddit,
 			throttle: 5000, // bigger delay for our script, since we're querying harder than most things do
-			login: {
-				username: nconf.get('user:name'),
-				password: nconf.get('user:password'),
-			},
 			oauth: {
 				type: 'script',
-				consumerKey: nconf.get('consumer:key'),
-				consumerSecret: nconf.get('consumer:secret'),
+				username: nconf.get('user:name'),
+				password: nconf.get('user:password'),
+				key: nconf.get('consumer:key'),
+				secret: nconf.get('consumer:secret'),
 				scope: [
 					'identity',
 					'read',
@@ -120,14 +118,9 @@ class TrainerRed {
 	}
 
 	queryDomain(domain) {
-		// /domain/:domain is undocumented and therefore unsupported by reddit-api-generator
-		// ...and therefore unsupported by snoocore, meaning we have to be a hacky asshole for this shit to work.
-		// a damn shame, since this makes the iterative function even MORE of an ugly mess, but oh well.
-		// once this endpoint is properly documented (and oauth-supported) we'll be able to get rid of raw mode in queryListing()
-		//
 		let self = this
-		return this.queryListing('https://www.reddit.com/domain/$domain/new.json', { $domain: domain },
-		{ raw: true, depth: 200 }).then( =>
+		return this.queryListing('/domain/$domain/new', { $domain: domain },
+		{ depth: 200 }).then( =>
 			let params = { $domain: domain, $last_scanned: Date.now() }
 			self.db.run('INSERT OR IGNORE INTO domainscans (domain, last_scanned) VALUES ($domain, $last_scanned)', params, function(err) {
 				if(err) return onError(err)
@@ -140,10 +133,10 @@ class TrainerRed {
 	}
 
 	queryUser(user) {
+		// we use queryUserErrorHandler here in order to ignore 404 users - also known as "the B&".
 		let self = this
-		// for some reason, this endpoint also requires raw mode. sigh.
-		return this.queryListing('https://www.reddit.com/user/$username/submitted.json', { $username: user, sort: 'new' },
-			{ raw: true, depth: 200, errorHandler: queryUserErrorHandler }).then(function() {
+		return this.queryListing('/user/$username/submitted', { $username: user, sort: 'new' },
+			{ depth: 200, errorHandler: queryUserErrorHandler }).then(function() {
 			let params = { $username: user, $last_scanned: Date.now() }
 			self.db.run('INSERT OR IGNORE INTO userscans (username, last_scanned) VALUES ($username, $last_scanned)', params, function(err) {
 				if(err) return onError(err)
@@ -156,45 +149,20 @@ class TrainerRed {
 	}
 
 	modmail(title, message) {
+		let self = this
 		return this.reddit("/api/compose").post({
 			api_type: 'json',
 			subject: title,
 			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + nodeBinary + ' ' + process.version,
-			to: '/r/' + this.subreddit
+			to: '/r/' + self.subreddit
 		})
 	}
-}
-
-// define our exports
-export default TrainerRed
-export var sha
-export var pkg
-export var nodeBinary
-export { when } from 'snoocore'
-
-
-// conversion stopped here
-
-
-
-function TrainerRed(configName, dbName) {
-
-	api
-
-	api.modmail = function(title, message) {
-		return reddit("/api/compose").post({
-			api_type: 'json',
-			subject: title,
-			text: message + "\n\n---\n\nThis message sent by TrainerRed " + pkg.version + sha + ' on ' + nodeBinary + ' ' + process.version,
-			to: '/r/' + subreddit
-		})
-	}
-
+	
 	// yes, I'm that lazy.
-	api.removalRate = function(removed, total) {
+	get removalRate(removed, total) {
 		return (removed == 0) ? 0 : Math.round((removed / total) * 1000) / 10
 	}
-
+	
 	//
 	// here be dragons!
 	// ...i'm serious.
@@ -203,13 +171,13 @@ function TrainerRed(configName, dbName) {
 	// said feature made this function FAR simpler in the end and probably dropped the size of the code by half.
 	//
 	// options param properties:
-	//  depth: how far to go in the iterative query
-	//  raw: should this use raw mode?
+	//  depth: how far to go in the iterative query?
 	//  queryOptions: options object to pass to snoocore for the query (such as overrides)
 	//  errorHandler: API query errorHandler override, useful for when we're dealing with users (and shadowbanned users 404'ing)
 	//
-	var queryListing = api.queryListing = function(uri, params, options) {
-		var ret = [],
+	queryListing(uri, params, options) {
+		let self = this,
+			ret = [],
 			options = options || {},
 			queryOptions = options.queryOptions || {},
 			depth = options.depth || 200,
@@ -219,30 +187,19 @@ function TrainerRed(configName, dbName) {
 			params.limit = maxFetch
 		}
 
-		// ugly hack around the domain/:domain/ thing mentioned above not being available.
-		// this is the heart of the iterative "raw mode". maybe sometime soon we'll be able to remove it.
-		var queryFn = function() {
-			if(options.raw === true) {
-				queryOptions = { bypassAuth: true }
-				return reddit.raw(uri)
-			}
-			queryOptions = {}
-			return reddit(uri)
-		}
-
 		// thank you based snoocore dev.
 		return when.iterate(function(slice) {
-				slice.children.map(iterativeExtractor).forEach(iterativeInserter)
+				slice.children.map(self.iterativeExtractor).forEach(self.iterativeInserter)
 				return slice.next()
 			},
 			function(slice) { return (slice.count >= depth || !!slice.empty ) },
 			function(slice) { return },
-			queryFn().listing(params, queryOptions)
+			self.reddit(uri).listing(params, queryOptions)
 		).catch(errorHandler)
 	}
-
+	
 	// dragons here too. careful now.
-	var iterativeExtractor = function(child) {
+	iterativeExtractor(child) {
 		// ignore self posts, they're irrelevant to us
 		// further, ignore anything outside our own subreddit (such as in the case of user/domain queries)
 		if(!child || child.data.is_self === true || child.data.subreddit !== subreddit) {
@@ -262,9 +219,10 @@ function TrainerRed(configName, dbName) {
 			$_removed: !!child.data.banned_by ? 1 : 0
 		}
 	}
-
+	
 	// no confirmed dragon sightings here, but we did see a big lizard. don't get careless.
-	var iterativeInserter = function(child) {
+	iterativeInserter(child) {
+		let self = this
 		if(!child || child === null) {
 			return
 		}
@@ -274,17 +232,17 @@ function TrainerRed(configName, dbName) {
 		// we're using time in milliseconds; reddit is going by UNIX standard, which is seconds.
 		// I -could- convert it over, but fuck it. I do what I want.
 
-		var sql = 'INSERT OR IGNORE INTO posts (id, banned_by, domain, approved_by, author, url, created_utc, permalink, _removed, _last_touched)'
+		let sql = 'INSERT OR IGNORE INTO posts (id, banned_by, domain, approved_by, author, url, created_utc, permalink, _removed, _last_touched)'
 		sql += 'VALUES ($id, $banned_by, $domain, $approved_by, $author, $url, $created_utc, $permalink, $_removed, $_last_touched)'
 
-		db.run(sql, child, function(err) {
+		self.db.run(sql, child, function(err) {
 			if(err) return onError(err)
 
 			if(!this.lastID) {
 				sql = 'UPDATE posts SET banned_by = $banned_by, approved_by = $approved_by, _removed = $_removed, _last_touched = $_last_touched'
 				sql += ' WHERE id = $id AND _last_touched > $_last_touched'
 				// no use trying to salvage the child object - just build a quick param object and go.
-				db.run(sql, {
+				self.db.run(sql, {
 					$id: child.$id,
 					$approved_by: child.$approved_by,
 					$banned_by: child.$banned_by,
@@ -294,8 +252,11 @@ function TrainerRed(configName, dbName) {
 			}
 		})
 	}
-
-	return api
 }
 
-module.exports = TrainerRed
+// define our exports
+export default TrainerRed
+export var sha
+export var pkg
+export var nodeBinary
+export { when } from 'snoocore'
